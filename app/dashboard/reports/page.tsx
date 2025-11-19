@@ -685,35 +685,6 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
-
-        {/* Export Options */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Export Options</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Download your reports in various formats</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Button variant="outline" className="justify-start">
-                <FileText className="h-4 w-4 mr-2" />
-                Export as PDF
-              </Button>
-              <Button variant="outline" className="justify-start">
-                <Download className="h-4 w-4 mr-2" />
-                Export as CSV
-              </Button>
-              <Button variant="outline" className="justify-start">
-                <FileText className="h-4 w-4 mr-2" />
-                Export as Excel
-              </Button>
-              <Button variant="outline" className="justify-start">
-                <Download className="h-4 w-4 mr-2" />
-                Email Report
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
           <TabsContent value="insights" className="space-y-4">
             <div className="grid gap-4">
@@ -844,6 +815,34 @@ export default function ReportsPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Export Options */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg">Export Options</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Download your reports in various formats</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Button variant="outline" className="justify-start">
+                <FileText className="h-4 w-4 mr-2" />
+                Export as PDF
+              </Button>
+              <Button variant="outline" className="justify-start">
+                <Download className="h-4 w-4 mr-2" />
+                Export as CSV
+              </Button>
+              <Button variant="outline" className="justify-start">
+                <FileText className="h-4 w-4 mr-2" />
+                Export as Excel
+              </Button>
+              <Button variant="outline" className="justify-start">
+                <Download className="h-4 w-4 mr-2" />
+                Email Report
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )

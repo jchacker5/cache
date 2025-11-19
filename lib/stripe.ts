@@ -1,21 +1,45 @@
 import Stripe from 'stripe'
 import { auth } from '@clerk/nextjs/server'
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set')
+let stripeInstance: Stripe | null = null
+
+function getStripe(): Stripe {
+  if (!stripeInstance) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is not set')
+    }
+    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-06-20',
+      typescript: true,
+    })
+  }
+  return stripeInstance
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-06-20',
-  typescript: true,
+export const stripe = new Proxy({} as Stripe, {
+  get(_, prop) {
+    return getStripe()[prop as keyof Stripe]
+  },
 })
 
-export const BASIC_PRICE_ID = process.env.STRIPE_BASIC_PRICE_ID!
-export const PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID!
-
-if (!BASIC_PRICE_ID || !PRO_PRICE_ID) {
-  throw new Error('Stripe price IDs are not set')
+export function getBasicPriceId(): string {
+  const id = process.env.STRIPE_BASIC_PRICE_ID
+  if (!id) {
+    throw new Error('STRIPE_BASIC_PRICE_ID is not set')
+  }
+  return id
 }
+
+export function getProPriceId(): string {
+  const id = process.env.STRIPE_PRO_PRICE_ID
+  if (!id) {
+    throw new Error('STRIPE_PRO_PRICE_ID is not set')
+  }
+  return id
+}
+
+export const BASIC_PRICE_ID = process.env.STRIPE_BASIC_PRICE_ID || ''
+export const PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID || ''
 
 export interface SubscriptionData {
   id: string
@@ -128,13 +152,15 @@ export async function updateSubscriptionPrice(subscriptionId: string, newPriceId
 }
 
 export function getTierFromPriceId(priceId: string): 'basic' | 'pro' {
-  if (priceId === BASIC_PRICE_ID) return 'basic'
-  if (priceId === PRO_PRICE_ID) return 'pro'
+  const basicId = getBasicPriceId()
+  const proId = getProPriceId()
+  if (priceId === basicId) return 'basic'
+  if (priceId === proId) return 'pro'
   throw new Error(`Unknown price ID: ${priceId}`)
 }
 
 export function getPriceIdFromTier(tier: 'basic' | 'pro'): string {
-  if (tier === 'basic') return BASIC_PRICE_ID
-  if (tier === 'pro') return PRO_PRICE_ID
+  if (tier === 'basic') return getBasicPriceId()
+  if (tier === 'pro') return getProPriceId()
   throw new Error(`Unknown tier: ${tier}`)
 }

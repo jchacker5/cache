@@ -198,6 +198,38 @@ export default function SavingsPage() {
   const goalsAchieved = goals.filter(g => g.is_completed || g.current_amount >= g.target_amount).length
   const goalsInProgress = goals.filter(g => !g.is_completed && g.current_amount < g.target_amount).length
 
+  // Calculate savings history (last 6 months)
+  const savingsHistory = Array.from({ length: 6 }, (_, i) => {
+    const date = new Date()
+    date.setMonth(date.getMonth() - (5 - i))
+    const monthKey = date.toLocaleString('default', { month: 'short' })
+    const monthTotal = goals.reduce((sum, goal) => {
+      // Simplified: assume linear progress
+      const monthsSinceStart = i
+      const projected = goal.current_amount + (goal.monthly_contribution * monthsSinceStart)
+      return sum + Math.min(projected, goal.target_amount)
+    }, 0)
+    return { month: monthKey, total: monthTotal }
+  })
+
+  // Calculate projection data (next 6 months)
+  const projectionData = Array.from({ length: 12 }, (_, i) => {
+    const date = new Date()
+    if (i < 6) {
+      date.setMonth(date.getMonth() - (5 - i))
+    } else {
+      date.setMonth(date.getMonth() + (i - 5))
+    }
+    const monthKey = date.toLocaleString('default', { month: 'short' })
+    const actual = i < 6 ? savingsHistory[i]?.total || 0 : null
+    const projected = goals.reduce((sum, goal) => {
+      const monthsAhead = Math.max(0, i - 5)
+      const projected = goal.current_amount + (goal.monthly_contribution * monthsAhead)
+      return sum + Math.min(projected, goal.target_amount)
+    }, 0)
+    return { month: monthKey, actual, projected }
+  })
+
   const deleteGoal = (id: string) => {
     handleDeleteGoal(id)
   }
@@ -696,7 +728,7 @@ export default function SavingsPage() {
                   </CardContent>
                 </Card>
               )
-            })}
+              })
             )}
           </div>
 
@@ -818,13 +850,13 @@ export default function SavingsPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Average Goal Progress</span>
                   <span className="text-sm font-semibold">
-                    {(goals.reduce((sum, g) => sum + (g.current / g.target) * 100, 0) / goals.length).toFixed(1)}%
+                    {goals.length > 0 ? (goals.reduce((sum, g) => sum + (g.current_amount / g.target_amount) * 100, 0) / goals.length).toFixed(1) : 0}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Closest to Completion</span>
                   <span className="text-sm font-semibold">
-                    {goals.sort((a, b) => (b.current / b.target) - (a.current / a.target))[0].name}
+                    {goals.length > 0 ? goals.sort((a, b) => (b.current_amount / b.target_amount) - (a.current_amount / a.target_amount))[0]?.name || 'N/A' : 'N/A'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
