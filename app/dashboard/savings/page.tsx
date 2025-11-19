@@ -14,6 +14,7 @@ import { Mountain, Menu, Bell, Settings, User, Plus, Edit, Trash2, Target, HomeI
 import Link from "next/link"
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { useAuth } from '@clerk/nextjs'
 import { useUser } from '@clerk/nextjs'
 import { toast } from 'sonner'
 
@@ -403,8 +404,17 @@ export default function SavingsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Target</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalTarget.toLocaleString()}</div>
-              <Progress value={totalProgress} className="mt-2" />
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-2"></div>
+                  <div className="h-2 bg-muted rounded"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">${totalTarget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <Progress value={totalProgress} className="mt-2" />
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -412,8 +422,17 @@ export default function SavingsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Goals Achieved</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{goalsAchieved}</div>
-              <p className="text-xs text-muted-foreground mt-1">{goalsInProgress} in progress</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-1"></div>
+                  <div className="h-3 bg-muted rounded w-1/2"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-green-600">{goalsAchieved}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{goalsInProgress} in progress</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -421,8 +440,17 @@ export default function SavingsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Contribution</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalMonthlyContribution.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">Across all goals</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-1"></div>
+                  <div className="h-3 bg-muted rounded w-3/4"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">${totalMonthlyContribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Across all goals</p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

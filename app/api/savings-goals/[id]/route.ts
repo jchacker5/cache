@@ -22,7 +22,7 @@ const contributeSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = auth()
@@ -31,7 +31,7 @@ export async function GET(
     }
 
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
 
     const { data: goal, error } = await supabase
       .from('savings_goals')
@@ -78,7 +78,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = auth()
@@ -87,7 +87,7 @@ export async function PUT(
     }
 
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
 
     // Validate input
@@ -132,7 +132,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = auth()
@@ -141,7 +141,7 @@ export async function DELETE(
     }
 
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
 
     // Delete savings goal (this will cascade to contributions)
     const { error } = await supabase
@@ -165,7 +165,7 @@ export async function DELETE(
 // POST /api/savings-goals/[id]/contribute - Add contribution to savings goal
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = auth()
@@ -174,7 +174,7 @@ export async function POST(
     }
 
     const supabase = createClient()
-    const { id } = params
+    const { id } = await params
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action')
 

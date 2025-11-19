@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Mountain, Menu, Bell, Settings, User, TrendingUp, TrendingDown, DollarSign, CreditCard, Wallet, Building2, ArrowUpRight, ArrowDownRight, Plus } from 'lucide-react'
+import { Mountain, Menu, Bell, Settings, User, TrendingUp, TrendingDown, DollarSign, CreditCard, Wallet, Building2, ArrowUpRight, ArrowDownRight, Plus, Loader2 } from 'lucide-react'
 import Link from "next/link"
 import { Line, LineChart, Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { DataService } from '@/lib/data-service'
+import { useAuth } from '@clerk/nextjs'
 
 const accounts = [
   { id: 1, name: 'Checking Account', type: 'checking', balance: 5420.50, bank: 'Chase Bank', last4: '1234', icon: Wallet, color: '#3b82f6' },
@@ -43,6 +45,27 @@ const recentActivity = [
 ]
 
 export default function BalancePage() {
+  const { userId } = useAuth()
+  const [accounts, setAccounts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (userId) {
+      loadAccounts()
+    }
+  }, [userId])
+
+  const loadAccounts = async () => {
+    try {
+      const data = await DataService.getAccounts(userId!)
+      setAccounts(data)
+    } catch (error) {
+      console.error('Error loading accounts:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0)
   const liquidBalance = accounts.filter(a => a.type !== 'credit').reduce((sum, acc) => sum + acc.balance, 0)
   const creditUtilization = Math.abs(accounts.filter(a => a.type === 'credit').reduce((sum, acc) => sum + acc.balance, 0))
@@ -50,6 +73,17 @@ export default function BalancePage() {
   const lastMonthBalance = balanceHistory[balanceHistory.length - 2]?.balance || 0
   const currentBalance = balanceHistory[balanceHistory.length - 1]?.balance || 0
   const balanceChange = ((currentBalance - lastMonthBalance) / lastMonthBalance) * 100
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-500">Loading your account data...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
