@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,111 +10,205 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Mountain, Menu, Bell, Settings, User, Plus, Edit, Trash2, Target, HomeIcon, Car, Plane, GraduationCap, TrendingUp, Calendar, DollarSign, Check, AlertCircle } from 'lucide-react'
+import { Mountain, Menu, Bell, Settings, User, Plus, Edit, Trash2, Target, HomeIcon, Car, Plane, GraduationCap, TrendingUp, Calendar, DollarSign, Check, AlertCircle, Loader2 } from 'lucide-react'
 import Link from "next/link"
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { useUser } from '@clerk/nextjs'
+import { toast } from 'sonner'
 
-const initialGoals = [
-  { 
-    id: 1, 
-    name: 'Emergency Fund', 
-    target: 10000, 
-    current: 8420, 
-    deadline: '2025-12-31', 
-    icon: Target, 
-    color: '#3b82f6',
-    category: 'essential',
-    monthlyContribution: 450
-  },
-  { 
-    id: 2, 
-    name: 'House Down Payment', 
-    target: 50000, 
-    current: 22500, 
-    deadline: '2027-06-30', 
-    icon: HomeIcon, 
-    color: '#8b5cf6',
-    category: 'major',
-    monthlyContribution: 1200
-  },
-  { 
-    id: 3, 
-    name: 'New Car', 
-    target: 25000, 
-    current: 5800, 
-    deadline: '2026-03-31', 
-    icon: Car, 
-    color: '#ec4899',
-    category: 'major',
-    monthlyContribution: 800
-  },
-  { 
-    id: 4, 
-    name: 'Vacation Fund', 
-    target: 5000, 
-    current: 2100, 
-    deadline: '2025-08-01', 
-    icon: Plane, 
-    color: '#10b981',
-    category: 'lifestyle',
-    monthlyContribution: 300
-  },
-  { 
-    id: 5, 
-    name: 'Education Fund', 
-    target: 15000, 
-    current: 4200, 
-    deadline: '2026-09-01', 
-    icon: GraduationCap, 
-    color: '#f59e0b',
-    category: 'education',
-    monthlyContribution: 500
-  },
-]
-
-const savingsHistory = [
-  { month: 'Jan', total: 38000 },
-  { month: 'Feb', total: 40500 },
-  { month: 'Mar', total: 42200 },
-  { month: 'Apr', total: 43800 },
-  { month: 'May', total: 45900 },
-  { month: 'Jun', total: 48020 },
-]
-
-const projectionData = [
-  { month: 'Now', actual: 48020, projected: 48020 },
-  { month: 'Jul', projected: 51270 },
-  { month: 'Aug', projected: 54520 },
-  { month: 'Sep', projected: 57770 },
-  { month: 'Oct', projected: 61020 },
-  { month: 'Nov', projected: 64270 },
-  { month: 'Dec', projected: 67520 },
-]
+interface SavingsGoal {
+  id: string
+  name: string
+  target_amount: number
+  current_amount: number
+  deadline?: string
+  priority: string
+  category?: string
+  monthly_contribution: number
+  description?: string
+  is_completed: boolean
+  created_at: string
+  progress?: number
+  remaining?: number
+  months_to_goal?: number
+  is_overdue?: boolean
+}
 
 export default function SavingsPage() {
-  const [goals, setGoals] = useState(initialGoals)
+  const { user } = useUser()
+  const [goals, setGoals] = useState<SavingsGoal[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isContributeOpen, setIsContributeOpen] = useState(false)
-  const [selectedGoal, setSelectedGoal] = useState<typeof initialGoals[0] | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null)
 
-  const totalTarget = goals.reduce((sum, g) => sum + g.target, 0)
-  const totalSaved = goals.reduce((sum, g) => sum + g.current, 0)
-  const totalProgress = (totalSaved / totalTarget) * 100
-  const totalMonthlyContribution = goals.reduce((sum, g) => sum + g.monthlyContribution, 0)
+  // Form data for new goal
+  const [newGoal, setNewGoal] = useState({
+    name: '',
+    target_amount: '',
+    current_amount: '0',
+    deadline: '',
+    priority: 'medium' as 'low' | 'medium' | 'high',
+    category: 'lifestyle',
+    monthly_contribution: '',
+    description: '',
+  })
 
-  const goalsAchieved = goals.filter(g => g.current >= g.target).length
-  const goalsInProgress = goals.filter(g => g.current < g.target).length
+  // Form data for contribution
+  const [contribution, setContribution] = useState({
+    amount: '',
+    notes: '',
+  })
 
-  const deleteGoal = (id: number) => {
-    setGoals(goals.filter(g => g.id !== id))
+  // Load data on mount
+  useEffect(() => {
+    if (user) {
+      loadData()
+    }
+  }, [user])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const response = await fetch('/api/savings-goals')
+      if (!response.ok) throw new Error('Failed to load savings goals')
+
+      const data = await response.json()
+      setGoals(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load savings goals')
+      console.error('Error loading savings goals:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const contributeToGoal = (goalId: number, amount: number) => {
-    setGoals(goals.map(g => g.id === goalId ? { ...g, current: g.current + amount } : g))
+  const handleCreateGoal = async () => {
+    if (!newGoal.name || !newGoal.target_amount) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const goalData = {
+        ...newGoal,
+        target_amount: parseFloat(newGoal.target_amount),
+        current_amount: parseFloat(newGoal.current_amount) || 0,
+        monthly_contribution: parseFloat(newGoal.monthly_contribution) || 0,
+      }
+
+      const response = await fetch('/api/savings-goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(goalData),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create savings goal')
+      }
+
+      toast.success('Savings goal created successfully')
+      setIsAddDialogOpen(false)
+      setNewGoal({
+        name: '',
+        target_amount: '',
+        current_amount: '0',
+        deadline: '',
+        priority: 'medium',
+        category: 'lifestyle',
+        monthly_contribution: '',
+        description: '',
+      })
+
+      // Reload data
+      loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create savings goal')
+      console.error('Error creating savings goal:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const getDaysRemaining = (deadline: string) => {
+  const handleContributeToGoal = async () => {
+    if (!selectedGoal || !contribution.amount) {
+      toast.error('Please enter a contribution amount')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/savings-goals/${selectedGoal.id}?action=contribute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: parseFloat(contribution.amount),
+          notes: contribution.notes,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to add contribution')
+      }
+
+      toast.success('Contribution added successfully')
+      setIsContributeOpen(false)
+      setSelectedGoal(null)
+      setContribution({ amount: '', notes: '' })
+
+      // Reload data
+      loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add contribution')
+      console.error('Error adding contribution:', err)
+    }
+  }
+
+  const handleDeleteGoal = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this savings goal?')) return
+
+    try {
+      const response = await fetch(`/api/savings-goals/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) throw new Error('Failed to delete savings goal')
+
+      toast.success('Savings goal deleted successfully')
+      loadData()
+    } catch (err) {
+      toast.error('Failed to delete savings goal')
+      console.error('Error deleting savings goal:', err)
+    }
+  }
+
+  // Calculate summary stats
+  const totalTarget = goals.reduce((sum, g) => sum + g.target_amount, 0)
+  const totalSaved = goals.reduce((sum, g) => sum + g.current_amount, 0)
+  const totalProgress = totalTarget > 0 ? (totalSaved / totalTarget) * 100 : 0
+  const totalMonthlyContribution = goals.reduce((sum, g) => sum + g.monthly_contribution, 0)
+
+  const goalsAchieved = goals.filter(g => g.is_completed || g.current_amount >= g.target_amount).length
+  const goalsInProgress = goals.filter(g => !g.is_completed && g.current_amount < g.target_amount).length
+
+  const deleteGoal = (id: string) => {
+    handleDeleteGoal(id)
+  }
+
+  const contributeToGoal = (goal: SavingsGoal) => {
+    setSelectedGoal(goal)
+    setIsContributeOpen(true)
+  }
+
+  const getDaysRemaining = (deadline?: string) => {
+    if (!deadline) return null
     const today = new Date()
     const target = new Date(deadline)
     const diff = target.getTime() - today.getTime()
