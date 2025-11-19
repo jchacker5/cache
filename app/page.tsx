@@ -7,6 +7,7 @@ import { Mountain, Shield, Zap, BarChart3, Wallet, ArrowRight, CheckCircle2 } fr
 import Link from "next/link"
 import { Globe } from "@/components/landing/globe"
 import { FeatureCard } from "@/components/landing/feature-card"
+import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 
 export default function Component() {
   return (
@@ -16,16 +17,26 @@ export default function Component() {
           <Mountain className="h-5 w-5 md:h-6 md:w-6" />
           <span className="font-bold text-lg md:text-xl">Cache</span>
         </Link>
-        <nav className="ml-auto flex gap-3 sm:gap-4 md:gap-6">
+        <nav className="ml-auto flex gap-3 sm:gap-4 md:gap-6 items-center">
           <Link href="#features" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors">
             Features
           </Link>
           <Link href="#pricing" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors hidden sm:inline">
             Pricing
           </Link>
-          <Link href="/dashboard" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors">
-            Dashboard
-          </Link>
+          <SignedOut>
+            <SignInButton mode="modal">
+              <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
+                Sign In
+              </Button>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <Link href="/dashboard" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors">
+              Dashboard
+            </Link>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
         </nav>
       </header>
       <main className="flex-1">
@@ -47,14 +58,25 @@ export default function Component() {
                 Experience the future of financial management. Real-time tracking, intelligent insights, and effortless control over your wealth.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 min-[400px]:gap-6 mt-8">
-                <Button asChild size="lg" className="h-12 px-8 text-base">
-                  <Link href="/dashboard">
-                    Get Started <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="h-12 px-8 text-base backdrop-blur-sm bg-background/50">
-                  <Link href="#features">Learn More</Link>
-                </Button>
+                <SignedOut>
+                  <SignUpButton mode="modal">
+                    <Button size="lg" className="h-12 px-8 text-base">
+                      Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </SignUpButton>
+                  <SignInButton mode="modal">
+                    <Button variant="outline" size="lg" className="h-12 px-8 text-base backdrop-blur-sm bg-background/50">
+                      Sign In
+                    </Button>
+                  </SignInButton>
+                </SignedOut>
+                <SignedIn>
+                  <Button asChild size="lg" className="h-12 px-8 text-base">
+                    <Link href="/dashboard">
+                      Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </SignedIn>
               </div>
             </div>
           </div>
