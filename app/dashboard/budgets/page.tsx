@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,41 +10,174 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Mountain, Menu, Bell, Settings, User, Plus, Edit, Trash2, ShoppingCart, Car, Home, Utensils, Smartphone, Coffee, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
+import { Mountain, Menu, Bell, Settings, User, Plus, Edit, Trash2, ShoppingCart, Car, Home, Utensils, Smartphone, Coffee, TrendingUp, TrendingDown, AlertTriangle, Loader2, AlertCircle } from 'lucide-react'
 import Link from "next/link"
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { ChartContainer } from "@/components/ui/chart"
+import { useUser } from '@clerk/nextjs'
+import { toast } from 'sonner'
 
-const initialBudgets = [
-  { id: 1, name: 'Food & Dining', spent: 850, budget: 1000, icon: Utensils, color: '#3b82f6', period: 'monthly' },
-  { id: 2, name: 'Transportation', spent: 420, budget: 500, icon: Car, color: '#8b5cf6', period: 'monthly' },
-  { id: 3, name: 'Shopping', spent: 680, budget: 800, icon: ShoppingCart, color: '#ec4899', period: 'monthly' },
-  { id: 4, name: 'Bills & Utilities', spent: 1200, budget: 1200, icon: Home, color: '#f59e0b', period: 'monthly' },
-  { id: 5, name: 'Entertainment', spent: 180, budget: 300, icon: Smartphone, color: '#10b981', period: 'monthly' },
-  { id: 6, name: 'Coffee & Snacks', spent: 95, budget: 150, icon: Coffee, color: '#6366f1', period: 'weekly' },
-]
+interface Budget {
+  id: string
+  name: string
+  amount: number
+  period: 'weekly' | 'monthly' | 'yearly'
+  spent: number
+  start_date: string
+  end_date?: string
+  alert_threshold: number
+  is_active: boolean
+  categories?: {
+    name: string
+    icon?: string
+    color?: string
+  }
+}
+
+interface Category {
+  id: string
+  name: string
+  icon?: string
+  color?: string
+}
 
 export default function BudgetsPage() {
-  const [budgets, setBudgets] = useState(initialBudgets)
+  const { user } = useUser()
+  const [budgets, setBudgets] = useState<Budget[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [editingBudget, setEditingBudget] = useState<typeof initialBudgets[0] | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const totalBudget = budgets.filter(b => b.period === 'monthly').reduce((sum, b) => sum + b.budget, 0)
+  // Form data for new budget
+  const [newBudget, setNewBudget] = useState({
+    category_id: '',
+    name: '',
+    amount: '',
+    period: 'monthly' as 'weekly' | 'monthly' | 'yearly',
+    start_date: new Date().toISOString().split('T')[0],
+    alert_threshold: '0.9',
+  })
+
+  // Load data on mount
+  useEffect(() => {
+    if (user) {
+      loadData()
+      loadCategories()
+    }
+  }, [user])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const response = await fetch('/api/budgets')
+      if (!response.ok) throw new Error('Failed to load budgets')
+
+      const data = await response.json()
+      setBudgets(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load budgets')
+      console.error('Error loading budgets:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('/api/categories')
+      if (response.ok) {
+        const data = await response.json()
+        setCategories(data)
+      }
+    } catch (err) {
+      console.error('Error loading categories:', err)
+    }
+  }
+
+  const handleCreateBudget = async () => {
+    if (!newBudget.category_id || !newBudget.name || !newBudget.amount) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const budgetData = {
+        ...newBudget,
+        amount: parseFloat(newBudget.amount),
+        alert_threshold: parseFloat(newBudget.alert_threshold),
+      }
+
+      const response = await fetch('/api/budgets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(budgetData),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create budget')
+      }
+
+      toast.success('Budget created successfully')
+      setIsAddDialogOpen(false)
+      setNewBudget({
+        category_id: '',
+        name: '',
+        amount: '',
+        period: 'monthly',
+        start_date: new Date().toISOString().split('T')[0],
+        alert_threshold: '0.9',
+      })
+
+      // Reload data
+      loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create budget')
+      console.error('Error creating budget:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteBudget = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this budget?')) return
+
+    try {
+      const response = await fetch(`/api/budgets/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) throw new Error('Failed to delete budget')
+
+      toast.success('Budget deleted successfully')
+      loadData()
+    } catch (err) {
+      toast.error('Failed to delete budget')
+      console.error('Error deleting budget:', err)
+    }
+  }
+
+  // Calculate summary stats
+  const totalBudget = budgets.filter(b => b.period === 'monthly').reduce((sum, b) => sum + b.amount, 0)
   const totalSpent = budgets.filter(b => b.period === 'monthly').reduce((sum, b) => sum + b.spent, 0)
-  const overallProgress = (totalSpent / totalBudget) * 100
+  const overallProgress = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
 
-  const budgetsAtRisk = budgets.filter(b => (b.spent / b.budget) >= 0.9).length
-  const budgetsOnTrack = budgets.filter(b => (b.spent / b.budget) < 0.75).length
+  const budgetsAtRisk = budgets.filter(b => {
+    const percentage = (b.spent / b.amount) * 100
+    return percentage >= b.alert_threshold * 100
+  }).length
+  const budgetsOnTrack = budgets.filter(b => (b.spent / b.amount) < 0.75).length
 
   const pieChartData = budgets.filter(b => b.period === 'monthly').map(b => ({
-    name: b.name,
+    name: b.categories?.name || b.name,
     value: b.spent,
-    color: b.color
+    color: b.categories?.color || '#6b7280'
   }))
-
-  const deleteBudget = (id: number) => {
-    setBudgets(budgets.filter(b => b.id !== id))
-  }
 
   const getStatusColor = (spent: number, budget: number) => {
     const percentage = (spent / budget) * 100
