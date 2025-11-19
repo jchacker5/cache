@@ -14,7 +14,6 @@ import { Mountain, Menu, Bell, Settings, User, Plus, Edit, Trash2, Target, HomeI
 import Link from "next/link"
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { useAuth } from '@clerk/nextjs'
 import { useUser } from '@clerk/nextjs'
 import { toast } from 'sonner'
 
@@ -321,28 +320,82 @@ export default function SavingsPage() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="goal-name">Goal Name</Label>
-                  <Input id="goal-name" placeholder="e.g., Vacation Fund" />
+                  <Label htmlFor="goal-name">Goal Name *</Label>
+                  <Input
+                    id="goal-name"
+                    placeholder="e.g., Vacation Fund"
+                    value={newGoal.name}
+                    onChange={(e) => setNewGoal(prev => ({ ...prev, name: e.target.value }))}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="goal-target">Target Amount</Label>
-                  <Input id="goal-target" type="number" placeholder="0.00" />
+                  <Label htmlFor="goal-target">Target Amount *</Label>
+                  <Input
+                    id="goal-target"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newGoal.target_amount}
+                    onChange={(e) => setNewGoal(prev => ({ ...prev, target_amount: e.target.value }))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="goal-current">Current Savings</Label>
-                  <Input id="goal-current" type="number" placeholder="0.00" defaultValue="0" />
+                  <Input
+                    id="goal-current"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newGoal.current_amount}
+                    onChange={(e) => setNewGoal(prev => ({ ...prev, current_amount: e.target.value }))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="goal-deadline">Target Date</Label>
-                  <Input id="goal-deadline" type="date" />
+                  <Input
+                    id="goal-deadline"
+                    type="date"
+                    value={newGoal.deadline}
+                    onChange={(e) => setNewGoal(prev => ({ ...prev, deadline: e.target.value }))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="goal-monthly">Monthly Contribution</Label>
-                  <Input id="goal-monthly" type="number" placeholder="0.00" />
+                  <Input
+                    id="goal-monthly"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newGoal.monthly_contribution}
+                    onChange={(e) => setNewGoal(prev => ({ ...prev, monthly_contribution: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="goal-priority">Priority</Label>
+                  <Select
+                    value={newGoal.priority}
+                    onValueChange={(value: 'low' | 'medium' | 'high') =>
+                      setNewGoal(prev => ({ ...prev, priority: value }))
+                    }
+                  >
+                    <SelectTrigger id="goal-priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="goal-category">Category</Label>
-                  <Select defaultValue="lifestyle">
+                  <Select
+                    value={newGoal.category}
+                    onValueChange={(value) =>
+                      setNewGoal(prev => ({ ...prev, category: value }))
+                    }
+                  >
                     <SelectTrigger id="goal-category">
                       <SelectValue />
                     </SelectTrigger>
@@ -355,9 +408,38 @@ export default function SavingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="goal-description">Description</Label>
+                  <Input
+                    id="goal-description"
+                    placeholder="Optional description"
+                    value={newGoal.description}
+                    onChange={(e) => setNewGoal(prev => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
                 <div className="flex gap-2 pt-4">
-                  <Button className="flex-1" onClick={() => setIsAddDialogOpen(false)}>Create Goal</Button>
-                  <Button variant="outline" className="flex-1" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleCreateGoal}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Goal'
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsAddDialogOpen(false)}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
                 </div>
               </div>
             </DialogContent>
@@ -458,13 +540,58 @@ export default function SavingsPage() {
         <div className="grid gap-6 lg:grid-cols-7">
           {/* Left Column - Goals List */}
           <div className="lg:col-span-4 space-y-4">
-            {goals.map((goal) => {
-              const percentage = (goal.current / goal.target) * 100
-              const remaining = goal.target - goal.current
-              const Icon = goal.icon
-              const daysRemaining = getDaysRemaining(goal.deadline)
-              const isCompleted = goal.current >= goal.target
-              const monthsToGoal = remaining / goal.monthlyContribution
+            {loading ? (
+              // Loading skeletons
+              Array.from({ length: 3 }).map((_, index) => (
+                <Card key={index}>
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="animate-pulse space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="w-12 h-12 bg-muted rounded-lg flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="h-5 bg-muted rounded w-3/4"></div>
+                            <div className="h-6 bg-muted rounded w-1/2"></div>
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <div className="w-8 h-8 bg-muted rounded"></div>
+                          <div className="w-8 h-8 bg-muted rounded"></div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-3 bg-muted rounded w-full"></div>
+                        <div className="flex justify-between">
+                          <div className="h-4 bg-muted rounded w-20"></div>
+                          <div className="h-4 bg-muted rounded w-24"></div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="h-8 bg-muted rounded w-24"></div>
+                        <div className="h-8 bg-muted rounded w-32"></div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : goals.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground mb-4">No savings goals created yet</p>
+                  <Button onClick={() => setIsAddDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Goal
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              goals.map((goal) => {
+                const percentage = (goal.current_amount / goal.target_amount) * 100
+                const remaining = goal.target_amount - goal.current_amount
+                const daysRemaining = getDaysRemaining(goal.deadline)
+                const isCompleted = goal.is_completed || goal.current_amount >= goal.target_amount
+                const monthsToGoal = goal.monthly_contribution > 0 ? remaining / goal.monthly_contribution : 0
               
               return (
                 <Card key={goal.id} className={isCompleted ? 'border-green-500 border-2' : ''}>
@@ -472,14 +599,14 @@ export default function SavingsPage() {
                     <div className="space-y-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className="p-3 rounded-lg flex-shrink-0" style={{ backgroundColor: `${goal.color}20` }}>
-                            <Icon className="h-6 w-6" style={{ color: goal.color }} />
+                          <div className="p-3 rounded-lg flex-shrink-0 bg-primary/10">
+                            <Target className="h-6 w-6 text-primary" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
                               <h3 className="font-bold text-base sm:text-lg">{goal.name}</h3>
-                              <Badge variant={getStatusColor(goal.current, goal.target)}>
-                                {getStatusText(goal.current, goal.target)}
+                              <Badge variant={getStatusColor(goal.current_amount, goal.target_amount)}>
+                                {getStatusText(goal.current_amount, goal.target_amount)}
                               </Badge>
                               {isCompleted && (
                                 <Badge className="bg-green-600">
@@ -487,29 +614,31 @@ export default function SavingsPage() {
                                   Achieved
                                 </Badge>
                               )}
+                              {goal.priority && (
+                                <Badge variant="outline" className="capitalize">
+                                  {goal.priority} priority
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className="text-xl sm:text-2xl font-bold">${goal.current.toLocaleString()}</span>
-                              <span className="text-sm text-muted-foreground">of ${goal.target.toLocaleString()}</span>
+                              <span className="text-xl sm:text-2xl font-bold">${goal.current_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              <span className="text-sm text-muted-foreground">of ${goal.target_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                             </div>
                           </div>
                         </div>
                         <div className="flex gap-1 flex-shrink-0">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8"
-                            onClick={() => {
-                              setSelectedGoal(goal)
-                              setIsContributeOpen(true)
-                            }}
+                            onClick={() => contributeToGoal(goal)}
                           >
                             <DollarSign className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteGoal(goal.id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteGoal(goal.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -518,9 +647,9 @@ export default function SavingsPage() {
                       <div className="space-y-2">
                         <Progress value={percentage} className="h-3" />
                         <div className="flex items-center justify-between text-xs sm:text-sm">
-                          <span className="text-muted-foreground">{percentage.toFixed(1)}% completed</span>
+                          <span className="text-muted-foreground">{percentage.toFixed(1)}% saved</span>
                           <span className={remaining > 0 ? 'text-amber-600 font-medium' : 'text-green-600 font-medium'}>
-                            {remaining > 0 ? `$${remaining.toLocaleString()} to go` : 'Goal Achieved!'}
+                            {remaining > 0 ? `$${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })} to go` : 'Goal Achieved!'}
                           </span>
                         </div>
                       </div>
@@ -531,17 +660,17 @@ export default function SavingsPage() {
                             <Calendar className="h-3.5 w-3.5" />
                             <span className="text-xs">Target Date</span>
                           </div>
-                          <p className="text-sm font-semibold">{new Date(goal.deadline).toLocaleDateString()}</p>
-                          <p className="text-xs text-muted-foreground">{daysRemaining > 0 ? `${daysRemaining} days left` : 'Past due'}</p>
+                          <p className="text-sm font-semibold">{goal.deadline ? new Date(goal.deadline).toLocaleDateString() : 'No deadline'}</p>
+                          <p className="text-xs text-muted-foreground">{daysRemaining && daysRemaining > 0 ? `${daysRemaining} days left` : goal.deadline ? 'Past due' : 'No deadline set'}</p>
                         </div>
                         <div>
                           <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
                             <DollarSign className="h-3.5 w-3.5" />
                             <span className="text-xs">Monthly</span>
                           </div>
-                          <p className="text-sm font-semibold">${goal.monthlyContribution}</p>
+                          <p className="text-sm font-semibold">${goal.monthly_contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                           <p className="text-xs text-muted-foreground">
-                            {!isCompleted && monthsToGoal > 0 ? `${Math.ceil(monthsToGoal)} months` : 'Completed'}
+                            {!isCompleted && monthsToGoal > 0 ? `${Math.ceil(monthsToGoal)} months to goal` : 'Completed'}
                           </p>
                         </div>
                       </div>
@@ -568,6 +697,7 @@ export default function SavingsPage() {
                 </Card>
               )
             })}
+            )}
           </div>
 
           {/* Right Column - Analytics */}
@@ -720,24 +850,56 @@ export default function SavingsPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="contribution-amount">Amount</Label>
-              <Input id="contribution-amount" type="number" placeholder="0.00" />
+              <Label htmlFor="contribution-amount">Amount *</Label>
+              <Input
+                id="contribution-amount"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={contribution.amount}
+                onChange={(e) => setContribution(prev => ({ ...prev, amount: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contribution-notes">Notes (Optional)</Label>
+              <Input
+                id="contribution-notes"
+                placeholder="e.g., Monthly contribution"
+                value={contribution.notes}
+                onChange={(e) => setContribution(prev => ({ ...prev, notes: e.target.value }))}
+              />
             </div>
             <div className="p-4 rounded-lg bg-muted">
               <div className="flex justify-between mb-2">
                 <span className="text-sm text-muted-foreground">Current</span>
-                <span className="text-sm font-semibold">${selectedGoal?.current.toLocaleString()}</span>
+                <span className="text-sm font-semibold">${selectedGoal?.current_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Target</span>
+                <span className="text-sm font-semibold">${selectedGoal?.target_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Target</span>
-                <span className="text-sm font-semibold">${selectedGoal?.target.toLocaleString()}</span>
+                <span className="text-sm text-muted-foreground">Progress</span>
+                <span className="text-sm font-semibold">{selectedGoal ? ((selectedGoal.current_amount / selectedGoal.target_amount) * 100).toFixed(1) : 0}%</span>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={() => setIsContributeOpen(false)}>
+              <Button
+                className="flex-1"
+                onClick={handleContributeToGoal}
+                disabled={!contribution.amount}
+              >
                 Add Contribution
               </Button>
-              <Button variant="outline" className="flex-1" onClick={() => setIsContributeOpen(false)}>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setIsContributeOpen(false)
+                  setSelectedGoal(null)
+                  setContribution({ amount: '', notes: '' })
+                }}
+              >
                 Cancel
               </Button>
             </div>
