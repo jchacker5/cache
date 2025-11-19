@@ -283,50 +283,131 @@ export default function BudgetsPage() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="budget-name">Category Name</Label>
-                  <Input id="budget-name" placeholder="e.g., Groceries" />
+                  <Label htmlFor="budget-name">Budget Name *</Label>
+                  <Input
+                    id="budget-name"
+                    placeholder="e.g., Monthly Groceries"
+                    value={newBudget.name}
+                    onChange={(e) => setNewBudget(prev => ({ ...prev, name: e.target.value }))}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="budget-amount">Budget Amount</Label>
-                  <Input id="budget-amount" type="number" placeholder="0.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="budget-period">Period</Label>
-                  <Select defaultValue="monthly">
-                    <SelectTrigger id="budget-period">
-                      <SelectValue />
+                  <Label htmlFor="budget-category">Category *</Label>
+                  <Select
+                    value={newBudget.category_id}
+                    onValueChange={(value) => setNewBudget(prev => ({ ...prev, category_id: value }))}
+                  >
+                    <SelectTrigger id="budget-category">
+                      <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="budget-amount">Budget Amount *</Label>
+                    <Input
+                      id="budget-amount"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={newBudget.amount}
+                      onChange={(e) => setNewBudget(prev => ({ ...prev, amount: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="budget-period">Period</Label>
+                    <Select
+                      value={newBudget.period}
+                      onValueChange={(value: 'weekly' | 'monthly' | 'yearly') =>
+                        setNewBudget(prev => ({ ...prev, period: value }))
+                      }
+                    >
+                      <SelectTrigger id="budget-period">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <Label htmlFor="budget-icon">Icon</Label>
-                  <Select defaultValue="shopping">
-                    <SelectTrigger id="budget-icon">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="food">Food & Dining</SelectItem>
-                      <SelectItem value="transport">Transportation</SelectItem>
-                      <SelectItem value="shopping">Shopping</SelectItem>
-                      <SelectItem value="home">Bills & Utilities</SelectItem>
-                      <SelectItem value="entertainment">Entertainment</SelectItem>
-                      <SelectItem value="coffee">Coffee & Snacks</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="budget-start-date">Start Date</Label>
+                  <Input
+                    id="budget-start-date"
+                    type="date"
+                    value={newBudget.start_date}
+                    onChange={(e) => setNewBudget(prev => ({ ...prev, start_date: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="budget-alert-threshold">Alert Threshold (%)</Label>
+                  <Input
+                    id="budget-alert-threshold"
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    placeholder="0.9"
+                    value={newBudget.alert_threshold}
+                    onChange={(e) => setNewBudget(prev => ({ ...prev, alert_threshold: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Alert when budget usage exceeds this percentage (0.9 = 90%)
+                  </p>
                 </div>
                 <div className="flex gap-2 pt-4">
-                  <Button className="flex-1" onClick={() => setIsAddDialogOpen(false)}>Create Budget</Button>
-                  <Button variant="outline" className="flex-1" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleCreateBudget}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Budget'
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsAddDialogOpen(false)}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Error State */}
+        {error && (
+          <Card className="mb-6 border-red-200">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm">{error}</span>
+                <Button variant="outline" size="sm" onClick={loadData} className="ml-auto">
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Overview Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
@@ -335,8 +416,17 @@ export default function BudgetsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Monthly Budget</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalBudget.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{budgets.filter(b => b.period === 'monthly').length} categories</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-1"></div>
+                  <div className="h-3 bg-muted rounded w-2/3"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">${totalBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{budgets.filter(b => b.period === 'monthly').length} categories</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -344,9 +434,19 @@ export default function BudgetsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Spent</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalSpent.toFixed(2)}</div>
-              <Progress value={overallProgress} className="mt-2" />
-              <p className="text-xs text-muted-foreground mt-1">{overallProgress.toFixed(0)}% of budget used</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-2"></div>
+                  <div className="h-2 bg-muted rounded mb-1"></div>
+                  <div className="h-3 bg-muted rounded w-3/4"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">${totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <Progress value={overallProgress} className="mt-2" />
+                  <p className="text-xs text-muted-foreground mt-1">{overallProgress.toFixed(0)}% of budget used</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -354,8 +454,17 @@ export default function BudgetsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Budgets At Risk</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-amber-600">{budgetsAtRisk}</div>
-              <p className="text-xs text-muted-foreground mt-1">90% or more spent</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-1"></div>
+                  <div className="h-3 bg-muted rounded w-1/2"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-amber-600">{budgetsAtRisk}</div>
+                  <p className="text-xs text-muted-foreground mt-1">90% or more spent</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -363,8 +472,17 @@ export default function BudgetsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">On Track</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{budgetsOnTrack}</div>
-              <p className="text-xs text-muted-foreground mt-1">Below 75% spent</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-1"></div>
+                  <div className="h-3 bg-muted rounded w-1/2"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-green-600">{budgetsOnTrack}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Below 75% spent</p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -378,68 +496,114 @@ export default function BudgetsPage() {
                 <CardDescription>Track spending limits for each category</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {budgets.map((budget) => {
-                  const percentage = (budget.spent / budget.budget) * 100
-                  const Icon = budget.icon
-                  const remaining = budget.budget - budget.spent
-                  
-                  return (
-                    <div key={budget.id} className="space-y-3 p-4 rounded-lg border bg-card">
+                {loading ? (
+                  // Loading skeletons
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="space-y-3 p-4 rounded-lg border bg-card animate-pulse">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="p-2.5 rounded-lg flex-shrink-0" style={{ backgroundColor: `${budget.color}20` }}>
-                            <Icon className="h-5 w-5" style={{ color: budget.color }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-sm sm:text-base">{budget.name}</h3>
-                              <Badge variant={getStatusColor(budget.spent, budget.budget)} className="text-xs">
-                                {getStatusText(budget.spent, budget.budget)}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs capitalize">
-                                {budget.period}
-                              </Badge>
-                            </div>
-                            <div className="flex items-baseline gap-2 mt-1">
-                              <span className="text-lg font-bold">${budget.spent.toFixed(2)}</span>
-                              <span className="text-sm text-muted-foreground">of ${budget.budget.toFixed(2)}</span>
-                            </div>
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-10 h-10 bg-muted rounded-lg flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-muted rounded w-3/4"></div>
+                            <div className="h-3 bg-muted rounded w-1/2"></div>
                           </div>
                         </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteBudget(budget.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <div className="flex gap-1">
+                          <div className="w-8 h-8 bg-muted rounded"></div>
+                          <div className="w-8 h-8 bg-muted rounded"></div>
                         </div>
                       </div>
-                      
-                      <div className="space-y-1.5">
-                        <Progress value={percentage} className="h-2.5" />
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">{percentage.toFixed(1)}% used</span>
-                          <span className={remaining >= 0 ? 'text-green-600' : 'text-red-600'}>
-                            {remaining >= 0 ? `$${remaining.toFixed(2)} left` : `$${Math.abs(remaining).toFixed(2)} over`}
-                          </span>
+                      <div className="space-y-2">
+                        <div className="h-2.5 bg-muted rounded"></div>
+                        <div className="flex justify-between">
+                          <div className="h-3 bg-muted rounded w-16"></div>
+                          <div className="h-3 bg-muted rounded w-20"></div>
                         </div>
                       </div>
-
-                      {percentage >= 90 && (
-                        <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
-                          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-amber-800">
-                            {percentage >= 100 
-                              ? `You've exceeded this budget by $${Math.abs(remaining).toFixed(2)}. Consider adjusting your spending.`
-                              : `You've used ${percentage.toFixed(0)}% of this budget. Only $${remaining.toFixed(2)} remaining.`
-                            }
-                          </p>
-                        </div>
-                      )}
                     </div>
-                  )
-                })}
+                  ))
+                ) : budgets.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">No budgets created yet</p>
+                    <Button onClick={() => setIsAddDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Budget
+                    </Button>
+                  </div>
+                ) : (
+                  budgets.map((budget) => {
+                    const percentage = (budget.spent / budget.amount) * 100
+                    const remaining = budget.amount - budget.spent
+
+                    return (
+                      <div key={budget.id} className="space-y-3 p-4 rounded-lg border bg-card">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div
+                              className="p-2.5 rounded-lg flex-shrink-0"
+                              style={{ backgroundColor: `${budget.categories?.color || '#6b7280'}20` }}
+                            >
+                              <div
+                                className="w-5 h-5 rounded"
+                                style={{ backgroundColor: budget.categories?.color || '#6b7280' }}
+                              ></div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold text-sm sm:text-base">{budget.name}</h3>
+                                <Badge variant={getStatusColor(budget.spent, budget.amount)} className="text-xs">
+                                  {getStatusText(budget.spent, budget.amount)}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs capitalize">
+                                  {budget.period}
+                                </Badge>
+                              </div>
+                              <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-lg font-bold">${budget.spent.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                <span className="text-sm text-muted-foreground">of ${budget.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => handleDeleteBudget(budget.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Progress value={percentage} className="h-2.5" />
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">{percentage.toFixed(1)}% used</span>
+                            <span className={remaining >= 0 ? 'text-green-600' : 'text-red-600'}>
+                              {remaining >= 0 ? `$${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })} left` : `$${Math.abs(remaining).toLocaleString('en-US', { minimumFractionDigits: 2 })} over`}
+                            </span>
+                          </div>
+                        </div>
+
+                        {percentage >= budget.alert_threshold * 100 && (
+                          <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-amber-800">
+                              {percentage >= 100
+                                ? `You've exceeded this budget by $${Math.abs(remaining).toLocaleString('en-US', { minimumFractionDigits: 2 })}. Consider adjusting your spending.`
+                                : `You've used ${percentage.toFixed(0)}% of this budget. Only $${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })} remaining.`
+                              }
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
               </CardContent>
             </Card>
           </div>

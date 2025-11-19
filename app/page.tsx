@@ -21,7 +21,7 @@ export default function Component() {
           <Link href="#features" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors">
             Features
           </Link>
-          <Link href="#pricing" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors hidden sm:inline">
+          <Link href="/pricing" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors hidden sm:inline">
             Pricing
           </Link>
           <SignedOut>

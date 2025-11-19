@@ -1,18 +1,42 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { FileText, BarChart3, ShoppingCart, Search } from 'lucide-react'
+import { FileText, BarChart3, ShoppingCart, Search, Loader2 } from 'lucide-react'
+import { DataService } from '@/lib/data-service'
+import { useAuth } from '@clerk/nextjs'
 
 export default function Dashboard() {
-  // Financial metrics data
-  const cash = 1280000
-  const burn = 22479.90
-  const runway = 4.8 // years
-  const todaySpending = 865.00
-  const last28Days = 23842.00
-  const last365Days = 249295.00
+  const [metrics, setMetrics] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const { userId } = useAuth()
+
+  useEffect(() => {
+    if (userId) {
+      loadDashboardData()
+    }
+  }, [userId])
+
+  const loadDashboardData = async () => {
+    try {
+      const data = await DataService.getDashboardMetrics(userId!)
+      setMetrics(data)
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Use loaded data or fallback to defaults
+  const cash = metrics?.cash ?? 1280000
+  const burn = metrics?.burn ?? 22479.90
+  const runway = metrics?.runway ?? 4.8
+  const todaySpending = metrics?.todaySpending ?? 865.00
+  const last28Days = metrics?.last28Days ?? 23842.00
+  const last365Days = metrics?.last365Days ?? 249295.00
 
   const formatCurrency = (amount: number) => {
     if (amount >= 1000000) {
