@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
+import { ClerkProviderWrapper } from '@/components/providers/clerk-provider'
+import { Toaster } from 'sonner'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -30,7 +32,10 @@ html {
         `}</style>
       </head>
       <body>
-        {children}
+        <ClerkProviderWrapper>
+          {children}
+          <Toaster position="top-right" richColors />
+        </ClerkProviderWrapper>
         <Analytics />
       </body>
     </html>

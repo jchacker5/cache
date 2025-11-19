@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,55 +10,238 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Mountain, Menu, Bell, Settings, User, Plus, Filter, Download, Search, Edit, Trash2, ShoppingCart, Car, Home, Utensils, DollarSign, Calendar, ArrowUpDown } from 'lucide-react'
+import { Mountain, Menu, Bell, Settings, User, Plus, Filter, Download, Search, Edit, Trash2, ShoppingCart, Car, Home, Utensils, DollarSign, Calendar, ArrowUpDown, Loader2, AlertCircle } from 'lucide-react'
 import Link from "next/link"
+import { useUser } from '@clerk/nextjs'
+import { categorizeTransaction } from '@/lib/ai/categorize'
+import { toast } from 'sonner'
 
-const allTransactions = [
-  { id: 1, name: 'Grocery Store', category: 'Food', amount: -85.50, date: '2024-01-15', status: 'completed', icon: ShoppingCart, merchant: 'Whole Foods' },
-  { id: 2, name: 'Gas Station', category: 'Transport', amount: -45.00, date: '2024-01-14', status: 'completed', icon: Car, merchant: 'Shell' },
-  { id: 3, name: 'Monthly Salary', category: 'Income', amount: 4500.00, date: '2024-01-13', status: 'completed', icon: DollarSign, merchant: 'Employer' },
-  { id: 4, name: 'Restaurant', category: 'Food', amount: -62.30, date: '2024-01-12', status: 'completed', icon: Utensils, merchant: 'Italian Bistro' },
-  { id: 5, name: 'Electric Bill', category: 'Bills', amount: -120.00, date: '2024-01-11', status: 'pending', icon: Home, merchant: 'Power Co.' },
-  { id: 6, name: 'Online Shopping', category: 'Shopping', amount: -149.99, date: '2024-01-10', status: 'completed', icon: ShoppingCart, merchant: 'Amazon' },
-  { id: 7, name: 'Coffee Shop', category: 'Food', amount: -4.50, date: '2024-01-10', status: 'completed', icon: Utensils, merchant: 'Starbucks' },
-  { id: 8, name: 'Uber Ride', category: 'Transport', amount: -18.75, date: '2024-01-09', status: 'completed', icon: Car, merchant: 'Uber' },
-  { id: 9, name: 'Gym Membership', category: 'Bills', amount: -50.00, date: '2024-01-08', status: 'completed', icon: Home, merchant: 'Fitness Center' },
-  { id: 10, name: 'Freelance Payment', category: 'Income', amount: 850.00, date: '2024-01-07', status: 'completed', icon: DollarSign, merchant: 'Client A' },
-  { id: 11, name: 'Gas Station', category: 'Transport', amount: -52.00, date: '2024-01-06', status: 'completed', icon: Car, merchant: 'BP' },
-  { id: 12, name: 'Grocery Store', category: 'Food', amount: -112.30, date: '2024-01-05', status: 'completed', icon: ShoppingCart, merchant: 'Trader Joes' },
-  { id: 13, name: 'Movie Tickets', category: 'Entertainment', amount: -35.00, date: '2024-01-04', status: 'completed', icon: ShoppingCart, merchant: 'AMC Theatres' },
-  { id: 14, name: 'Internet Bill', category: 'Bills', amount: -79.99, date: '2024-01-03', status: 'completed', icon: Home, merchant: 'ISP Provider' },
-  { id: 15, name: 'Restaurant', category: 'Food', amount: -45.20, date: '2024-01-02', status: 'completed', icon: Utensils, merchant: 'Sushi Place' },
-]
+interface Transaction {
+  id: string
+  description: string
+  merchant?: string
+  amount: number
+  type: 'income' | 'expense' | 'transfer'
+  date: string
+  notes?: string
+  tags?: string[]
+  ai_categorized?: boolean
+  ai_confidence?: number
+  accounts: {
+    name: string
+    type: string
+    currency: string
+  }
+  categories?: {
+    name: string
+    icon?: string
+    color?: string
+  }
+}
+
+interface Account {
+  id: string
+  name: string
+  type: string
+  balance: number
+  currency: string
+}
+
+interface Category {
+  id: string
+  name: string
+  icon?: string
+  color?: string
+}
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState(allTransactions)
+  const { user } = useUser()
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Form states
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [accountFilter, setAccountFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [editingTransaction, setEditingTransaction] = useState<typeof allTransactions[0] | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Filter and sort transactions
-  const filteredTransactions = transactions
-    .filter(t => {
-      const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           t.merchant.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter
-      const matchesStatus = statusFilter === 'all' || t.status === statusFilter
-      return matchesSearch && matchesCategory && matchesStatus
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.date).getTime()
-      const dateB = new Date(b.date).getTime()
-      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB
-    })
+  // Form data for new transaction
+  const [newTransaction, setNewTransaction] = useState({
+    account_id: '',
+    description: '',
+    merchant: '',
+    amount: '',
+    type: 'expense' as 'income' | 'expense' | 'transfer',
+    date: new Date().toISOString().split('T')[0],
+    notes: '',
+  })
 
-  const deleteTransaction = (id: number) => {
-    setTransactions(transactions.filter(t => t.id !== id))
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalTransactions, setTotalTransactions] = useState(0)
+
+  // Load data on mount
+  useEffect(() => {
+    if (user) {
+      loadData()
+    }
+  }, [user, currentPage, searchQuery, categoryFilter, accountFilter, typeFilter, sortOrder])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '20',
+        sortBy: 'date',
+        sortOrder,
+      })
+
+      if (searchQuery) params.set('search', searchQuery)
+      if (categoryFilter !== 'all') params.set('category', categoryFilter)
+      if (accountFilter !== 'all') params.set('account', accountFilter)
+      if (typeFilter !== 'all') params.set('type', typeFilter)
+
+      const response = await fetch(`/api/transactions?${params}`)
+      if (!response.ok) throw new Error('Failed to load transactions')
+
+      const data = await response.json()
+      setTransactions(data.transactions || [])
+      setTotalPages(data.pagination?.pages || 1)
+      setTotalTransactions(data.pagination?.total || 0)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load transactions')
+      console.error('Error loading transactions:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
+  // Load accounts and categories for dropdowns
+  useEffect(() => {
+    const loadReferenceData = async () => {
+      try {
+        const [accountsRes, categoriesRes] = await Promise.all([
+          fetch('/api/accounts'),
+          fetch('/api/categories')
+        ])
+
+        if (accountsRes.ok) {
+          const accountsData = await accountsRes.json()
+          setAccounts(accountsData)
+        }
+
+        if (categoriesRes.ok) {
+          const categoriesData = await categoriesRes.json()
+          setCategories(categoriesData)
+        }
+      } catch (err) {
+        console.error('Error loading reference data:', err)
+      }
+    }
+
+    if (user) {
+      loadReferenceData()
+    }
+  }, [user])
+
+  const handleCreateTransaction = async () => {
+    if (!newTransaction.account_id || !newTransaction.description || !newTransaction.amount) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      // Auto-categorize if it's an expense
+      let categoryId = undefined
+      if (newTransaction.type === 'expense') {
+        try {
+          const categorization = await categorizeTransaction({
+            description: newTransaction.description,
+            merchant: newTransaction.merchant,
+            amount: parseFloat(newTransaction.amount),
+          })
+
+          // Find matching category
+          const matchingCategory = categories.find(c => c.name === categorization.category)
+          if (matchingCategory) {
+            categoryId = matchingCategory.id
+          }
+        } catch (err) {
+          console.error('AI categorization failed:', err)
+          // Continue without categorization
+        }
+      }
+
+      const transactionData = {
+        ...newTransaction,
+        amount: parseFloat(newTransaction.amount),
+        category_id: categoryId,
+      }
+
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transactionData),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create transaction')
+      }
+
+      toast.success('Transaction created successfully')
+      setIsAddDialogOpen(false)
+      setNewTransaction({
+        account_id: '',
+        description: '',
+        merchant: '',
+        amount: '',
+        type: 'expense',
+        date: new Date().toISOString().split('T')[0],
+        notes: '',
+      })
+
+      // Reload data
+      loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create transaction')
+      console.error('Error creating transaction:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this transaction?')) return
+
+    try {
+      const response = await fetch(`/api/transactions/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) throw new Error('Failed to delete transaction')
+
+      toast.success('Transaction deleted successfully')
+      loadData()
+    } catch (err) {
+      toast.error('Failed to delete transaction')
+      console.error('Error deleting transaction:', err)
+    }
+  }
+
+  // Calculate summary stats
   const totalIncome = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0)
   const totalExpense = Math.abs(transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0))
   const netAmount = totalIncome - totalExpense
@@ -152,40 +335,113 @@ export default function TransactionsPage() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="new-name">Description</Label>
-                  <Input id="new-name" placeholder="e.g., Grocery shopping" />
+                  <Label htmlFor="new-description">Description *</Label>
+                  <Input
+                    id="new-description"
+                    placeholder="e.g., Grocery shopping"
+                    value={newTransaction.description}
+                    onChange={(e) => setNewTransaction(prev => ({ ...prev, description: e.target.value }))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-merchant">Merchant</Label>
-                  <Input id="new-merchant" placeholder="e.g., Whole Foods" />
+                  <Input
+                    id="new-merchant"
+                    placeholder="e.g., Whole Foods"
+                    value={newTransaction.merchant}
+                    onChange={(e) => setNewTransaction(prev => ({ ...prev, merchant: e.target.value }))}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-amount">Amount *</Label>
+                    <Input
+                      id="new-amount"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={newTransaction.amount}
+                      onChange={(e) => setNewTransaction(prev => ({ ...prev, amount: e.target.value }))}
+                    />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new-amount">Amount</Label>
-                  <Input id="new-amount" type="number" placeholder="0.00" />
+                    <Label htmlFor="new-type">Type</Label>
+                    <Select
+                      value={newTransaction.type}
+                      onValueChange={(value: 'income' | 'expense' | 'transfer') =>
+                        setNewTransaction(prev => ({ ...prev, type: value }))
+                      }
+                    >
+                      <SelectTrigger id="new-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="expense">Expense</SelectItem>
+                        <SelectItem value="income">Income</SelectItem>
+                        <SelectItem value="transfer">Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new-category">Category</Label>
-                  <Select>
-                    <SelectTrigger id="new-category">
-                      <SelectValue placeholder="Select category" />
+                  <Label htmlFor="new-account">Account *</Label>
+                  <Select
+                    value={newTransaction.account_id}
+                    onValueChange={(value) => setNewTransaction(prev => ({ ...prev, account_id: value }))}
+                  >
+                    <SelectTrigger id="new-account">
+                      <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="food">Food & Dining</SelectItem>
-                      <SelectItem value="transport">Transportation</SelectItem>
-                      <SelectItem value="shopping">Shopping</SelectItem>
-                      <SelectItem value="bills">Bills & Utilities</SelectItem>
-                      <SelectItem value="income">Income</SelectItem>
-                      <SelectItem value="entertainment">Entertainment</SelectItem>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name} ({account.type})
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-date">Date</Label>
-                  <Input id="new-date" type="date" />
+                  <Input
+                    id="new-date"
+                    type="date"
+                    value={newTransaction.date}
+                    onChange={(e) => setNewTransaction(prev => ({ ...prev, date: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-notes">Notes</Label>
+                  <Input
+                    id="new-notes"
+                    placeholder="Optional notes"
+                    value={newTransaction.notes}
+                    onChange={(e) => setNewTransaction(prev => ({ ...prev, notes: e.target.value }))}
+                  />
                 </div>
                 <div className="flex gap-2 pt-4">
-                  <Button className="flex-1" onClick={() => setIsAddDialogOpen(false)}>Save Transaction</Button>
-                  <Button variant="outline" className="flex-1" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleCreateTransaction}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Save Transaction'
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsAddDialogOpen(false)}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
                 </div>
               </div>
             </DialogContent>
@@ -225,10 +481,25 @@ export default function TransactionsPage() {
           </Card>
         </div>
 
+        {/* Error State */}
+        {error && (
+          <Card className="mb-6 border-red-200">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm">{error}</span>
+                <Button variant="outline" size="sm" onClick={loadData} className="ml-auto">
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Filters */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <div className="space-y-2">
                 <Label htmlFor="search" className="text-sm">Search</Label>
                 <div className="relative">
@@ -250,25 +521,41 @@ export default function TransactionsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    <SelectItem value="Food">Food & Dining</SelectItem>
-                    <SelectItem value="Transport">Transportation</SelectItem>
-                    <SelectItem value="Shopping">Shopping</SelectItem>
-                    <SelectItem value="Bills">Bills & Utilities</SelectItem>
-                    <SelectItem value="Income">Income</SelectItem>
-                    <SelectItem value="Entertainment">Entertainment</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="status-filter" className="text-sm">Status</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger id="status-filter">
+                <Label htmlFor="account-filter" className="text-sm">Account</Label>
+                <Select value={accountFilter} onValueChange={setAccountFilter}>
+                  <SelectTrigger id="account-filter">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="all">All Accounts</SelectItem>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="type-filter" className="text-sm">Type</Label>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger id="type-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="income">Income</SelectItem>
+                    <SelectItem value="expense">Expense</SelectItem>
+                    <SelectItem value="transfer">Transfer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -292,95 +579,145 @@ export default function TransactionsPage() {
         {/* Transactions Table - Desktop */}
         <Card className="hidden md:block">
           <CardContent className="p-0">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="ml-2">Loading transactions...</span>
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                No transactions found
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Merchant</TableHead>
+                    <TableHead>Account</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Status</TableHead>
+                    <TableHead>Type</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTransactions.map((transaction) => {
-                  const Icon = transaction.icon
-                  return (
+                  {transactions.map((transaction) => (
                     <TableRow key={transaction.id}>
-                      <TableCell className="font-medium">{transaction.date}</TableCell>
+                      <TableCell className="font-medium">
+                        {new Date(transaction.date).toLocaleDateString()}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className="p-2 rounded-full bg-muted">
-                            <Icon className="h-4 w-4" />
+                            <DollarSign className="h-4 w-4" />
                           </div>
-                          {transaction.name}
+                          <div>
+                            <div className="font-medium">{transaction.description}</div>
+                            {transaction.ai_categorized && (
+                              <Badge variant="outline" className="text-xs mt-1">
+                                AI categorized
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell>{transaction.merchant}</TableCell>
+                      <TableCell>{transaction.accounts?.name}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{transaction.category}</Badge>
+                        <Badge variant="secondary">
+                          {transaction.categories?.name || 'Uncategorized'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={transaction.status === 'completed' ? 'default' : 'outline'}>
-                          {transaction.status}
+                        <Badge variant="outline" className="capitalize">
+                          {transaction.type}
                         </Badge>
                       </TableCell>
                       <TableCell className={`text-right font-semibold ${transaction.amount > 0 ? 'text-green-600' : 'text-foreground'}`}>
-                        {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toFixed(2)}
+                        {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteTransaction(transaction.id)}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => handleDeleteTransaction(transaction.id)}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
-                  )
-                })}
+                  ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
 
         {/* Transactions List - Mobile */}
         <div className="md:hidden space-y-3">
-          {filteredTransactions.map((transaction) => {
-            const Icon = transaction.icon
-            return (
+          {loading ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Loading transactions...</p>
+              </CardContent>
+            </Card>
+          ) : transactions.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                No transactions found
+              </CardContent>
+            </Card>
+          ) : (
+            transactions.map((transaction) => (
               <Card key={transaction.id}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
                       <div className="p-2 rounded-full bg-muted flex-shrink-0">
-                        <Icon className="h-4 w-4" />
+                        <DollarSign className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm">{transaction.name}</p>
-                        <p className="text-xs text-muted-foreground">{transaction.merchant}</p>
+                        <p className="font-medium text-sm">{transaction.description}</p>
+                        <p className="text-xs text-muted-foreground">{transaction.merchant || transaction.accounts?.name}</p>
                         <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="secondary" className="text-xs">{transaction.category}</Badge>
-                          <Badge variant={transaction.status === 'completed' ? 'default' : 'outline'} className="text-xs">
-                            {transaction.status}
+                          <Badge variant="secondary" className="text-xs">
+                            {transaction.categories?.name || 'Uncategorized'}
                           </Badge>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {transaction.type}
+                          </Badge>
+                          {transaction.ai_categorized && (
+                            <Badge variant="outline" className="text-xs">
+                              AI
+                            </Badge>
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">{transaction.date}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(transaction.date).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className={`text-sm font-semibold mb-2 ${transaction.amount > 0 ? 'text-green-600' : 'text-foreground'}`}>
-                        {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toFixed(2)}
+                        {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </p>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7">
                           <Edit className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteTransaction(transaction.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => handleDeleteTransaction(transaction.id)}
+                        >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
@@ -388,8 +725,8 @@ export default function TransactionsPage() {
                   </div>
                 </CardContent>
               </Card>
-            )
-          })}
+            ))
+          )}
         </div>
 
         {filteredTransactions.length === 0 && (

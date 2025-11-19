@@ -1,158 +1,166 @@
 'use client'
 
-import React, { useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { Points, PointMaterial } from '@react-three/drei'
-import * as THREE from 'three'
+import React from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Mountain } from 'lucide-react'
+import { Mountain, Shield, Zap, BarChart3, Wallet, ArrowRight, CheckCircle2 } from 'lucide-react'
 import Link from "next/link"
-
-function Globe() {
-  const points = useRef()
-
-  useFrame((state, delta) => {
-    if (points.current) {
-      points.current.rotation.y += delta * 0.1
-    }
-  })
-
-  const particlesPosition = React.useMemo(() => {
-    const positions = new Float32Array(10000 * 3)
-    const radius = 2
-
-    for (let i = 0; i < 10000; i++) {
-      const theta = THREE.MathUtils.randFloatSpread(360)
-      const phi = THREE.MathUtils.randFloatSpread(360)
-
-      const x = radius * Math.sin(theta) * Math.cos(phi)
-      const y = radius * Math.sin(theta) * Math.sin(phi)
-      const z = radius * Math.cos(theta)
-
-      positions.set([x, y, z], i * 3)
-    }
-
-    return positions
-  }, [])
-
-  return (
-    <Points ref={points} positions={particlesPosition} stride={3} frustumCulled={false}>
-      <PointMaterial
-        transparent
-        color="#ffffff"
-        size={0.02}
-        sizeAttenuation={true}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </Points>
-  )
-}
+import { Globe } from "@/components/landing/globe"
+import { FeatureCard } from "@/components/landing/feature-card"
 
 export default function Component() {
   return (
-    <div className="flex flex-col min-h-[100dvh]">
-      <header className="px-4 lg:px-6 h-14 flex items-center border-b">
+    <div className="flex flex-col min-h-[100dvh] bg-background text-foreground">
+      <header className="px-4 lg:px-6 h-14 flex items-center border-b bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <Link href="/" className="flex items-center justify-center gap-2">
           <Mountain className="h-5 w-5 md:h-6 md:w-6" />
           <span className="font-bold text-lg md:text-xl">Cache</span>
         </Link>
         <nav className="ml-auto flex gap-3 sm:gap-4 md:gap-6">
-          <Link href="#features" className="text-xs sm:text-sm font-medium hover:underline underline-offset-4">
+          <Link href="#features" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors">
             Features
           </Link>
-          <Link href="#pricing" className="text-xs sm:text-sm font-medium hover:underline underline-offset-4 hidden sm:inline">
+          <Link href="#pricing" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors hidden sm:inline">
             Pricing
           </Link>
-          <Link href="/dashboard" className="text-xs sm:text-sm font-medium hover:underline underline-offset-4">
+          <Link href="/dashboard" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors">
             Dashboard
           </Link>
         </nav>
       </header>
       <main className="flex-1">
-        <section className="relative w-full h-[calc(100vh-3.5rem)] bg-black">
-          <Canvas camera={{ position: [0, 0, 6] }}>
-            <ambientLight intensity={0.5} />
-            <Globe />
-          </Canvas>
-          <div className="absolute inset-0 flex items-center justify-center px-4">
-            <div className="text-center text-white z-10 max-w-4xl">
-              <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl">
-                Cache
+        {/* Hero Section */}
+        <section className="relative w-full h-[calc(100vh-3.5rem)] overflow-hidden flex items-center justify-center">
+          <Globe />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/50 to-background pointer-events-none" />
+
+          <div className="container px-4 md:px-6 relative z-10">
+            <div className="flex flex-col items-center space-y-4 text-center">
+              <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary/10 text-primary hover:bg-primary/20">
+                New: AI-Powered Insights
+              </div>
+              <h1 className="text-4xl font-extrabold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
+                Master Your Money <br className="hidden sm:inline" />
+                With Precision
               </h1>
-              <p className="mx-auto max-w-[90%] sm:max-w-[600px] text-gray-300 mt-3 sm:mt-4 text-base sm:text-lg md:text-xl px-4">
-                Manage your spending with ease and precision
+              <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
+                Experience the future of financial management. Real-time tracking, intelligent insights, and effortless control over your wealth.
               </p>
-              <div className="mt-6 sm:mt-8">
-                <Button asChild className="bg-white text-black hover:bg-gray-200 h-10 sm:h-11 px-6 sm:px-8 text-sm sm:text-base">
-                  <Link href="/dashboard">Get Started</Link>
+              <div className="flex flex-col sm:flex-row gap-4 min-[400px]:gap-6 mt-8">
+                <Button asChild size="lg" className="h-12 px-8 text-base">
+                  <Link href="/dashboard">
+                    Get Started <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="h-12 px-8 text-base backdrop-blur-sm bg-background/50">
+                  <Link href="#features">Learn More</Link>
                 </Button>
               </div>
             </div>
           </div>
         </section>
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-white" id="features">
-          <div className="container px-4 md:px-6 mx-auto">
-            <div className="grid items-center gap-6 lg:grid-cols-2 lg:gap-12">
-              <div className="aspect-video bg-gray-100 rounded-xl flex items-center justify-center order-2 lg:order-1">
-                <span className="text-gray-400 text-sm sm:text-base">Dashboard Preview</span>
-              </div>
-              <div className="flex flex-col justify-center space-y-4 order-1 lg:order-2">
-                <div className="space-y-2">
-                  <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tighter">
-                    Spend smarter, not harder
-                  </h2>
-                  <p className="max-w-[600px] text-gray-500 text-sm sm:text-base md:text-lg lg:text-xl leading-relaxed">
-                    Cache gives you real-time insights into your spending habits, helping you make informed financial decisions.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  <Button asChild className="w-full min-[400px]:w-auto">
-                    <Link href="/dashboard">Get Started</Link>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full min-[400px]:w-auto">
-                    <Link href="#cta">Learn More</Link>
-                  </Button>
-                </div>
-              </div>
+
+        {/* Social Proof */}
+        <section className="w-full py-12 border-y bg-muted/30">
+          <div className="container px-4 md:px-6">
+            <p className="text-center text-sm font-medium text-muted-foreground mb-8">
+              TRUSTED BY FORWARD-THINKING FINANCE TEAMS
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center justify-items-center opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+              {/* Placeholder Logos using text for now, ideally SVGs */}
+              <div className="flex items-center gap-2 font-bold text-xl"><Shield className="h-6 w-6" /> SecureBank</div>
+              <div className="flex items-center gap-2 font-bold text-xl"><Zap className="h-6 w-6" /> FastPay</div>
+              <div className="flex items-center gap-2 font-bold text-xl"><BarChart3 className="h-6 w-6" /> GrowthFund</div>
+              <div className="flex items-center gap-2 font-bold text-xl"><Wallet className="h-6 w-6" /> SmartWallet</div>
             </div>
           </div>
         </section>
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-gray-100" id="cta">
-          <div className="container px-4 md:px-6 mx-auto">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
-              <div className="space-y-2 max-w-3xl">
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tighter">
-                  Start managing your finances today
+
+        {/* Features Section */}
+        <section className="w-full py-24 md:py-32" id="features">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-16">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">
+                Everything you need to succeed
+              </h2>
+              <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                Powerful features designed to give you complete control over your financial life.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <FeatureCard
+                title="Real-time Tracking"
+                description="Monitor your transactions as they happen with sub-second latency updates."
+                icon={Zap}
+              />
+              <FeatureCard
+                title="AI Insights"
+                description="Get personalized recommendations and spending analysis powered by advanced ML."
+                icon={BarChart3}
+              />
+              <FeatureCard
+                title="Bank-Grade Security"
+                description="Your data is encrypted with AES-256 and protected by multi-factor authentication."
+                icon={Shield}
+              />
+              <FeatureCard
+                title="Smart Budgeting"
+                description="Set dynamic budgets that adjust automatically based on your spending habits."
+                icon={Wallet}
+              />
+              <FeatureCard
+                title="Goal Tracking"
+                description="Visualize your progress towards financial goals with interactive charts."
+                icon={Mountain}
+              />
+              <FeatureCard
+                title="Automated Savings"
+                description="Automatically round up purchases and save the difference to your vault."
+                icon={CheckCircle2}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="w-full py-24 md:py-32 bg-primary text-primary-foreground relative overflow-hidden">
+          <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
+          <div className="container px-4 md:px-6 relative z-10">
+            <div className="flex flex-col items-center justify-center space-y-8 text-center">
+              <div className="space-y-4 max-w-3xl">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">
+                  Ready to take control?
                 </h2>
-                <p className="mx-auto max-w-[600px] text-gray-500 text-sm sm:text-base md:text-lg lg:text-xl leading-relaxed px-4">
-                  Join thousands of users who have taken control of their spending with Cache.
+                <p className="mx-auto max-w-[600px] text-primary-foreground/80 md:text-xl">
+                  Join thousands of users who have transformed their financial health with Cache.
                 </p>
               </div>
-              <div className="w-full max-w-sm space-y-2 px-4">
+              <div className="w-full max-w-sm space-y-4">
                 <form className="flex flex-col sm:flex-row gap-2">
-                  <Input className="flex-1" placeholder="Enter your email" type="email" />
-                  <Button type="submit" className="w-full sm:w-auto">Sign Up</Button>
+                  <Input
+                    className="flex-1 bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-primary-foreground/50"
+                    placeholder="Enter your email"
+                    type="email"
+                  />
+                  <Button type="submit" variant="secondary" className="w-full sm:w-auto font-bold">
+                    Get Started
+                  </Button>
                 </form>
-                <p className="text-xs text-gray-500">
-                  By signing up, you agree to our{" "}
-                  <Link className="underline underline-offset-2" href="#">
-                    Terms & Conditions
-                  </Link>
+                <p className="text-xs text-primary-foreground/60">
+                  No credit card required. 14-day free trial.
                 </p>
               </div>
             </div>
           </div>
         </section>
       </main>
-      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-gray-500 text-center sm:text-left">© 2025 Cache Inc. All rights reserved.</p>
+      <footer className="flex flex-col gap-2 sm:flex-row py-8 w-full shrink-0 items-center px-4 md:px-6 border-t">
+        <p className="text-xs text-muted-foreground text-center sm:text-left">© 2025 Cache Inc. All rights reserved.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link className="text-xs hover:underline underline-offset-4" href="#">
+          <Link className="text-xs hover:underline underline-offset-4 text-muted-foreground" href="#">
             Terms of Service
           </Link>
-          <Link className="text-xs hover:underline underline-offset-4" href="#">
+          <Link className="text-xs hover:underline underline-offset-4 text-muted-foreground" href="#">
             Privacy
           </Link>
         </nav>
