@@ -153,4 +153,14 @@ export class DataService {
     await new Promise(resolve => setTimeout(resolve, 50))
     return mockBudgets.filter(b => b.userId === userId)
   }
+
+  static async getSavingsGoals(userId: string) {
+    await new Promise(resolve => setTimeout(resolve, 50))
+    return []
+  }
+
+  static async getAiInsights(userId: string) {
+    await new Promise(resolve => setTimeout(resolve, 50))
+    return []
+  }
 }
