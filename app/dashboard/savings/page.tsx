@@ -363,6 +363,21 @@ export default function SavingsPage() {
           </Dialog>
         </div>
 
+        {/* Error State */}
+        {error && (
+          <Card className="mb-6 border-red-200">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm">{error}</span>
+                <Button variant="outline" size="sm" onClick={loadData} className="ml-auto">
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Overview Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
           <Card>
@@ -370,8 +385,17 @@ export default function SavingsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Saved</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">${totalSaved.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">{totalProgress.toFixed(1)}% of target</p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-1"></div>
+                  <div className="h-3 bg-muted rounded w-3/4"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-green-600">${totalSaved.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{totalProgress.toFixed(1)}% of target</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>

@@ -16,6 +16,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import { ChartContainer } from "@/components/ui/chart"
 import { useUser } from '@clerk/nextjs'
 import { toast } from 'sonner'
+import { DataService } from '@/lib/data-service'
 
 interface Budget {
   id: string
@@ -69,15 +70,14 @@ export default function BudgetsPage() {
   }, [user])
 
   const loadData = async () => {
+    if (!user?.id) return
+
     try {
       setLoading(true)
       setError(null)
 
-      const response = await fetch('/api/budgets')
-      if (!response.ok) throw new Error('Failed to load budgets')
-
-      const data = await response.json()
-      setBudgets(data)
+      const data = await DataService.getBudgets(user.id)
+      setBudgets(data as any)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load budgets')
       console.error('Error loading budgets:', err)
@@ -87,15 +87,14 @@ export default function BudgetsPage() {
   }
 
   const loadCategories = async () => {
-    try {
-      const response = await fetch('/api/categories')
-      if (response.ok) {
-        const data = await response.json()
-        setCategories(data)
-      }
-    } catch (err) {
-      console.error('Error loading categories:', err)
-    }
+    // For MVP, use hardcoded categories
+    setCategories([
+      { id: 'cat1', name: 'Food & Dining', icon: 'utensils', color: '#3b82f6' },
+      { id: 'cat2', name: 'Transportation', icon: 'car', color: '#8b5cf6' },
+      { id: 'cat3', name: 'Shopping', icon: 'shopping-cart', color: '#ec4899' },
+      { id: 'cat4', name: 'Bills & Utilities', icon: 'home', color: '#f59e0b' },
+      { id: 'cat5', name: 'Entertainment', icon: 'tv', color: '#10b981' },
+    ])
   }
 
   const handleCreateBudget = async () => {
