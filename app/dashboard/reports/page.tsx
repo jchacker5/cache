@@ -486,7 +486,7 @@ export default function ReportsPage() {
                         </div>
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-primary rounded-full transition-all"
                           style={{ width: `${expense.percentage}%` }}
                         />
@@ -837,10 +837,6 @@ export default function ReportsPage() {
               <Button variant="outline" className="justify-start">
                 <FileText className="h-4 w-4 mr-2" />
                 Export as Excel
-              </Button>
-              <Button variant="outline" className="justify-start">
-                <Download className="h-4 w-4 mr-2" />
-                Email Report
               </Button>
             </div>
           </CardContent>

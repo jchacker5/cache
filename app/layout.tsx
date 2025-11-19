@@ -33,12 +33,12 @@ html {
         `}</style>
       </head>
       <body>
-        <ConvexClientProvider>
-          <ClerkProviderWrapper>
+        <ClerkProviderWrapper>
+          <ConvexClientProvider>
             {children}
             <Toaster position="top-right" richColors />
-          </ClerkProviderWrapper>
-        </ConvexClientProvider>
+          </ConvexClientProvider>
+        </ClerkProviderWrapper>
         <Analytics />
       </body>
     </html>

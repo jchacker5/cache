@@ -626,112 +626,111 @@ export default function SavingsPage() {
                 const daysRemaining = getDaysRemaining(goal.deadline)
                 const isCompleted = goal.is_completed || goal.current_amount >= goal.target_amount
                 const monthsToGoal = goal.monthly_contribution > 0 ? remaining / goal.monthly_contribution : 0
-              
-              return (
-                <Card key={goal.id} className={isCompleted ? 'border-green-500 border-2' : ''}>
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className="p-3 rounded-lg flex-shrink-0 bg-primary/10">
-                            <Target className="h-6 w-6 text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <h3 className="font-bold text-base sm:text-lg">{goal.name}</h3>
-                              <Badge variant={getStatusColor(goal.current_amount, goal.target_amount)}>
-                                {getStatusText(goal.current_amount, goal.target_amount)}
-                              </Badge>
-                              {isCompleted && (
-                                <Badge className="bg-green-600">
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Achieved
-                                </Badge>
-                              )}
-                              {goal.priority && (
-                                <Badge variant="outline" className="capitalize">
-                                  {goal.priority} priority
-                                </Badge>
-                              )}
+
+                return (
+                  <Card key={goal.id} className={isCompleted ? 'border-green-500 border-2' : ''}>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="space-y-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className="p-3 rounded-lg flex-shrink-0 bg-primary/10">
+                              <Target className="h-6 w-6 text-primary" />
                             </div>
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className="text-xl sm:text-2xl font-bold">${goal.current_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                              <span className="text-sm text-muted-foreground">of ${goal.target_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <h3 className="font-bold text-base sm:text-lg">{goal.name}</h3>
+                                <Badge variant={getStatusColor(goal.current_amount, goal.target_amount)}>
+                                  {getStatusText(goal.current_amount, goal.target_amount)}
+                                </Badge>
+                                {isCompleted && (
+                                  <Badge className="bg-green-600">
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Achieved
+                                  </Badge>
+                                )}
+                                {goal.priority && (
+                                  <Badge variant="outline" className="capitalize">
+                                    {goal.priority} priority
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-baseline gap-2 flex-wrap">
+                                <span className="text-xl sm:text-2xl font-bold">${goal.current_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                <span className="text-sm text-muted-foreground">of ${goal.target_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => contributeToGoal(goal)}
-                          >
-                            <DollarSign className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteGoal(goal.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Progress value={percentage} className="h-3" />
-                        <div className="flex items-center justify-between text-xs sm:text-sm">
-                          <span className="text-muted-foreground">{percentage.toFixed(1)}% saved</span>
-                          <span className={remaining > 0 ? 'text-amber-600 font-medium' : 'text-green-600 font-medium'}>
-                            {remaining > 0 ? `$${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })} to go` : 'Goal Achieved!'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 p-3 rounded-lg bg-muted/50">
-                        <div>
-                          <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                            <Calendar className="h-3.5 w-3.5" />
-                            <span className="text-xs">Target Date</span>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => contributeToGoal(goal)}
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteGoal(goal.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <p className="text-sm font-semibold">{goal.deadline ? new Date(goal.deadline).toLocaleDateString() : 'No deadline'}</p>
-                          <p className="text-xs text-muted-foreground">{daysRemaining && daysRemaining > 0 ? `${daysRemaining} days left` : goal.deadline ? 'Past due' : 'No deadline set'}</p>
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                            <DollarSign className="h-3.5 w-3.5" />
-                            <span className="text-xs">Monthly</span>
+
+                        <div className="space-y-2">
+                          <Progress value={percentage} className="h-3" />
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
+                            <span className="text-muted-foreground">{percentage.toFixed(1)}% saved</span>
+                            <span className={remaining > 0 ? 'text-amber-600 font-medium' : 'text-green-600 font-medium'}>
+                              {remaining > 0 ? `$${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })} to go` : 'Goal Achieved!'}
+                            </span>
                           </div>
-                          <p className="text-sm font-semibold">${goal.monthly_contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {!isCompleted && monthsToGoal > 0 ? `${Math.ceil(monthsToGoal)} months to goal` : 'Completed'}
-                          </p>
                         </div>
+
+                        <div className="grid grid-cols-2 gap-4 p-3 rounded-lg bg-muted/50">
+                          <div>
+                            <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                              <Calendar className="h-3.5 w-3.5" />
+                              <span className="text-xs">Target Date</span>
+                            </div>
+                            <p className="text-sm font-semibold">{goal.deadline ? new Date(goal.deadline).toLocaleDateString() : 'No deadline'}</p>
+                            <p className="text-xs text-muted-foreground">{daysRemaining && daysRemaining > 0 ? `${daysRemaining} days left` : goal.deadline ? 'Past due' : 'No deadline set'}</p>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                              <DollarSign className="h-3.5 w-3.5" />
+                              <span className="text-xs">Monthly</span>
+                            </div>
+                            <p className="text-sm font-semibold">${goal.monthly_contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {!isCompleted && monthsToGoal > 0 ? `${Math.ceil(monthsToGoal)} months to goal` : 'Completed'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {!isCompleted && daysRemaining < 90 && remaining > 0 && (
+                          <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
+                            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-amber-800">
+                              You need to save ${(remaining / (daysRemaining / 30)).toFixed(0)}/month to reach this goal on time.
+                            </p>
+                          </div>
+                        )}
+
+                        {isCompleted && (
+                          <div className="flex items-start gap-2 p-3 rounded-md bg-green-50 border border-green-200">
+                            <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-green-800">
+                              Congratulations! You've achieved this savings goal. Consider setting a new goal.
+                            </p>
+                          </div>
+                        )}
                       </div>
-
-                      {!isCompleted && daysRemaining < 90 && remaining > 0 && (
-                        <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
-                          <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-amber-800">
-                            You need to save ${(remaining / (daysRemaining / 30)).toFixed(0)}/month to reach this goal on time.
-                          </p>
-                        </div>
-                      )}
-
-                      {isCompleted && (
-                        <div className="flex items-start gap-2 p-3 rounded-md bg-green-50 border border-green-200">
-                          <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-green-800">
-                            Congratulations! You've achieved this savings goal. Consider setting a new goal.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-              })
-            )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
           </div>
 
           {/* Right Column - Analytics */}
