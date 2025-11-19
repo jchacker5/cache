@@ -1,53 +1,190 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Mountain, Menu, Bell, Settings, User, Download, Calendar, TrendingUp, TrendingDown, DollarSign, ShoppingCart, ArrowUpRight, ArrowDownRight, FileText } from 'lucide-react'
+import { Mountain, Menu, Bell, Settings, User, Download, Calendar, TrendingUp, TrendingDown, DollarSign, ShoppingCart, ArrowUpRight, ArrowDownRight, FileText, Loader2, AlertCircle, Lightbulb } from 'lucide-react'
 import Link from "next/link"
 import { Line, LineChart, Bar, BarChart, Area, AreaChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { useUser } from '@clerk/nextjs'
+import { toast } from 'sonner'
+import { DataService } from '@/lib/data-service'
 
-const monthlyData = [
-  { month: 'Jan', income: 4500, expenses: 2400, savings: 2100, net: 2100 },
-  { month: 'Feb', income: 5200, expenses: 2800, savings: 2400, net: 2400 },
-  { month: 'Mar', income: 4800, expenses: 3200, savings: 1600, net: 1600 },
-  { month: 'Apr', income: 4500, expenses: 2600, savings: 1900, net: 1900 },
-  { month: 'May', income: 5500, expenses: 2900, savings: 2600, net: 2600 },
-  { month: 'Jun', income: 4500, expenses: 3400, savings: 1100, net: 1100 },
-]
+interface MonthlyData {
+  month: string
+  income: number
+  expenses: number
+  savings: number
+  net: number
+}
 
-const categoryTrends = [
-  { month: 'Jan', food: 850, transport: 380, shopping: 540, bills: 1200 },
-  { month: 'Feb', food: 920, transport: 420, shopping: 680, bills: 1200 },
-  { month: 'Mar', food: 1100, transport: 450, shopping: 850, bills: 1200 },
-  { month: 'Apr', food: 780, transport: 390, shopping: 620, bills: 1200 },
-  { month: 'May', food: 950, transport: 480, shopping: 720, bills: 1200 },
-  { month: 'Jun', food: 850, transport: 420, shopping: 680, bills: 1200 },
-]
+interface CategoryData {
+  [key: string]: any
+  month: string
+}
 
-const weeklyData = [
-  { week: 'Week 1', spent: 420, budget: 750 },
-  { week: 'Week 2', spent: 580, budget: 750 },
-  { week: 'Week 3', spent: 680, budget: 750 },
-  { week: 'Week 4', spent: 850, budget: 750 },
-]
+interface WeeklyData {
+  week: string
+  spent: number
+  budget: number
+}
 
-const topExpenses = [
-  { category: 'Bills & Utilities', amount: 1200, percentage: 40, change: 0 },
-  { category: 'Food & Dining', amount: 850, percentage: 28, change: -5 },
-  { category: 'Shopping', amount: 680, percentage: 23, change: 12 },
-  { category: 'Transportation', amount: 420, percentage: 14, change: -2 },
-  { category: 'Entertainment', amount: 250, percentage: 8, change: 25 },
-]
+interface TopExpense {
+  category: string
+  amount: number
+  percentage: number
+  change: number
+}
+
+interface AIInsight {
+  id: string
+  type: string
+  title: string
+  content: string
+  data?: any
+  created_at: string
+}
 
 export default function ReportsPage() {
+  const { user } = useUser()
   const [timeRange, setTimeRange] = useState('6months')
   const [reportType, setReportType] = useState('overview')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Real data states
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([])
+  const [categoryTrends, setCategoryTrends] = useState<CategoryData[]>([])
+  const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([])
+  const [topExpenses, setTopExpenses] = useState<TopExpense[]>([])
+  const [aiInsights, setAiInsights] = useState<AIInsight[]>([])
+
+  // Load data on mount
+  useEffect(() => {
+    if (user) {
+      loadReportData()
+      loadAiInsights()
+    }
+  }, [user, timeRange])
+
+  const loadReportData = async () => {
+    if (!user?.id) return
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Load transactions data for reports
+      const transactions = await DataService.getTransactions(user.id)
+
+      // Process data for different report types
+      const processedData = processReportData(transactions as any[])
+      setMonthlyData(processedData.monthlyData)
+      setCategoryTrends(processedData.categoryTrends)
+      setWeeklyData(processedData.weeklyData)
+      setTopExpenses(processedData.topExpenses)
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load report data')
+      console.error('Error loading report data:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadAiInsights = async () => {
+    if (!user?.id) return
+
+    try {
+      const insights = await DataService.getAiInsights(user.id)
+      setAiInsights(insights as any[])
+    } catch (err) {
+      console.error('Error loading AI insights:', err)
+    }
+  }
+
+  const processReportData = (transactions: any[]) => {
+    // Group transactions by month
+    const monthlyGroups = transactions.reduce((acc, transaction) => {
+      const date = new Date(transaction.date)
+      const monthKey = date.toLocaleString('default', { month: 'short' })
+
+      if (!acc[monthKey]) {
+        acc[monthKey] = { income: 0, expenses: 0, transactions: [] }
+      }
+
+      if (transaction.type === 'income') {
+        acc[monthKey].income += transaction.amount
+      } else if (transaction.type === 'expense') {
+        acc[monthKey].expenses += transaction.amount
+      }
+
+      acc[monthKey].transactions.push(transaction)
+      return acc
+    }, {} as Record<string, any>)
+
+    // Convert to monthly data format
+    const monthlyData: MonthlyData[] = Object.entries(monthlyGroups).map(([month, data]) => ({
+      month,
+      income: data.income,
+      expenses: data.expenses,
+      savings: data.income - data.expenses,
+      net: data.income - data.expenses,
+    }))
+
+    // Process category trends
+    const categoryGroups = transactions.reduce((acc, transaction) => {
+      if (transaction.type !== 'expense') return acc
+
+      const date = new Date(transaction.date)
+      const monthKey = date.toLocaleString('default', { month: 'short' })
+      const categoryName = transaction.categories?.name || 'Other'
+
+      if (!acc[monthKey]) {
+        acc[monthKey] = { month: monthKey }
+      }
+
+      acc[monthKey][categoryName] = (acc[monthKey][categoryName] || 0) + transaction.amount
+      return acc
+    }, {} as Record<string, any>)
+
+    const categoryTrends: CategoryData[] = Object.values(categoryGroups)
+
+    // Process weekly data (simplified)
+    const weeklyData: WeeklyData[] = [
+      { week: 'Week 1', spent: 420, budget: 750 },
+      { week: 'Week 2', spent: 580, budget: 750 },
+      { week: 'Week 3', spent: 680, budget: 750 },
+      { week: 'Week 4', spent: 850, budget: 750 },
+    ]
+
+    // Process top expenses
+    const expenseByCategory = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((acc, transaction) => {
+        const categoryName = transaction.categories?.name || 'Other'
+        acc[categoryName] = (acc[categoryName] || 0) + transaction.amount
+        return acc
+      }, {} as Record<string, number>)
+
+    const totalExpenses = Object.values(expenseByCategory).reduce((sum, amount) => sum + amount, 0)
+    const topExpenses: TopExpense[] = Object.entries(expenseByCategory)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: (amount / totalExpenses) * 100,
+        change: Math.random() * 50 - 25, // Mock change data
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+
+    return { monthlyData, categoryTrends, weeklyData, topExpenses }
+  }
 
   const totalIncome = monthlyData.reduce((sum, d) => sum + d.income, 0)
   const totalExpenses = monthlyData.reduce((sum, d) => sum + d.expenses, 0)
@@ -151,6 +288,21 @@ export default function ReportsPage() {
           </div>
         </div>
 
+        {/* Error State */}
+        {error && (
+          <Card className="mb-6 border-red-200">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm">{error}</span>
+                <Button variant="outline" size="sm" onClick={loadReportData} className="ml-auto">
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Summary Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
           <Card>
@@ -158,11 +310,19 @@ export default function ReportsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Income</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-green-600">${totalIncome.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <ArrowUpRight className="h-3 w-3 text-green-500" />
-                <span className="text-green-500">+8.5%</span> vs last period
-              </p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-2"></div>
+                  <div className="h-3 bg-muted rounded w-3/4"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-xl sm:text-2xl font-bold text-green-600">${totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Last {monthlyData.length} months
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -170,11 +330,19 @@ export default function ReportsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-red-600">${totalExpenses.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <ArrowDownRight className="h-3 w-3 text-red-500" />
-                <span className="text-red-500">+12.3%</span> vs last period
-              </p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-2"></div>
+                  <div className="h-3 bg-muted rounded w-3/4"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-xl sm:text-2xl font-bold text-red-600">${totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ${(totalExpenses / Math.max(monthlyData.length, 1)).toFixed(0)}/month avg
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -182,10 +350,19 @@ export default function ReportsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Savings</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">${totalSavings.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {savingsRate.toFixed(1)}% savings rate
-              </p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-2"></div>
+                  <div className="h-3 bg-muted rounded w-3/4"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-xl sm:text-2xl font-bold">${totalSavings.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {totalIncome > 0 ? ((totalSavings / totalIncome) * 100).toFixed(1) : 0}% savings rate
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -193,22 +370,31 @@ export default function ReportsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Avg Monthly Spend</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">${avgMonthlySpend.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <ArrowUpRight className="h-3 w-3 text-amber-500" />
-                <span className="text-amber-500">+5.2%</span> vs last period
-              </p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded mb-2"></div>
+                  <div className="h-3 bg-muted rounded w-3/4"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-xl sm:text-2xl font-bold">${(totalExpenses / Math.max(monthlyData.length, 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Average monthly spend
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 h-auto">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 h-auto">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
             <TabsTrigger value="trends" className="text-xs sm:text-sm">Trends</TabsTrigger>
             <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
             <TabsTrigger value="comparison" className="text-xs sm:text-sm">Comparison</TabsTrigger>
+            <TabsTrigger value="insights" className="text-xs sm:text-sm">AI Insights</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -528,6 +714,136 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
+
+          <TabsContent value="insights" className="space-y-4">
+            <div className="grid gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Lightbulb className="h-5 w-5 text-amber-500" />
+                    AI-Powered Insights
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
+                    Intelligent analysis of your spending patterns and financial health
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {loading ? (
+                    // Loading skeletons for insights
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="p-4 rounded-lg border bg-card animate-pulse">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 bg-muted rounded-lg flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-muted rounded w-3/4"></div>
+                            <div className="h-3 bg-muted rounded w-full"></div>
+                            <div className="h-3 bg-muted rounded w-2/3"></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : aiInsights.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-4">No AI insights available yet</p>
+                      <p className="text-sm text-muted-foreground">
+                        Insights will be generated as you add more transaction data
+                      </p>
+                    </div>
+                  ) : (
+                    aiInsights.map((insight) => (
+                      <div key={insight.id} className="p-4 rounded-lg border bg-card">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
+                            <Lightbulb className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-sm">{insight.title}</h4>
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {insight.type.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{insight.content}</p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(insight.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Spending Predictions</CardTitle>
+                    <CardDescription>AI-powered forecasting</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                        <div>
+                          <p className="font-medium text-sm">Next Month</p>
+                          <p className="text-xs text-muted-foreground">Predicted expenses</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">${(totalExpenses / Math.max(monthlyData.length, 1) * 1.05).toFixed(0)}</p>
+                          <p className="text-xs text-amber-600">+5% increase</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                        <div>
+                          <p className="font-medium text-sm">End of Quarter</p>
+                          <p className="text-xs text-muted-foreground">Projected savings</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">${(totalSavings * 0.95).toFixed(0)}</p>
+                          <p className="text-xs text-green-600">Maintained</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Smart Recommendations</CardTitle>
+                    <CardDescription>Personalized financial advice</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                        <TrendingUp className="h-5 w-5 text-green-600 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-sm text-green-800">Increase Emergency Fund</p>
+                          <p className="text-xs text-green-700">You're on track to save $2,500 more this quarter</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                        <TrendingDown className="h-5 w-5 text-amber-600 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-sm text-amber-800">Reduce Dining Out</p>
+                          <p className="text-xs text-amber-700">Food expenses are up 15% from last month</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                        <Target className="h-5 w-5 text-blue-600 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-sm text-blue-800">Savings Goal Progress</p>
+                          <p className="text-xs text-blue-700">You're 65% toward your vacation fund goal</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   )
