@@ -1,19 +1,16 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { clerkMiddleware } from '@clerk/nextjs/server'
 import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
-])
-
-export default clerkMiddleware(async (auth, req) => {
-  // Protect routes
-  if (isProtectedRoute(req)) {
+export default clerkMiddleware(async (auth, req: NextRequest) => {
+  // Protect dashboard routes
+  if (req.nextUrl.pathname.startsWith('/dashboard')) {
     await auth.protect()
   }
 
   // Update Supabase session
-  let supabaseResponse = NextResponse.next({
+  let response = NextResponse.next({
     request: req,
   })
 
@@ -27,11 +24,11 @@ export default clerkMiddleware(async (auth, req) => {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
+          response = NextResponse.next({
             request: req,
           })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            response.cookies.set(name, value, options)
           )
         },
       },
@@ -39,11 +36,9 @@ export default clerkMiddleware(async (auth, req) => {
   )
 
   // Refresh session if expired
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  await supabase.auth.getUser()
 
-  return supabaseResponse
+  return response
 })
 
 export const config = {
