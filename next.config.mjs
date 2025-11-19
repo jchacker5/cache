@@ -6,6 +6,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  webpack: (config) => {
+    // Ensure proper module resolution for Clerk
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+    }
+    return config
+  },
 }
 
 export default nextConfig

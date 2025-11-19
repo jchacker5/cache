@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Mountain, Menu, Bell, Settings, User, Plus, Filter, Download, Search, Edit, Trash2, ShoppingCart, Car, Home, Utensils, DollarSign, Calendar, ArrowUpDown, Loader2, AlertCircle } from 'lucide-react'
 import Link from "next/link"
-import { useUser } from '@clerk/nextjs'
+import { useSafeUser } from '@/hooks/use-safe-user'
 import { categorizeTransaction } from '@/lib/ai/categorize'
 import { toast } from 'sonner'
 import { DataService } from '@/lib/data-service'
@@ -56,7 +58,7 @@ interface Category {
 }
 
 export default function TransactionsPage() {
-  const { user } = useUser()
+  const { user } = useSafeUser()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -758,7 +760,7 @@ export default function TransactionsPage() {
           )}
         </div>
 
-        {filteredTransactions.length === 0 && (
+        {transactions.length === 0 && !loading && (
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground">No transactions found matching your filters</p>

@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
@@ -156,43 +158,57 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <SignedOut>
-                  <SignUpButton mode="modal">
-                    <Button
-                      className="w-full mt-6"
-                      variant={plan.popular ? 'default' : 'outline'}
-                      size="lg"
-                    >
-                      {loading === plan.tier ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Starting Trial...
-                        </>
-                      ) : (
-                        plan.buttonText
-                      )}
-                    </Button>
-                  </SignUpButton>
-                </SignedOut>
-
-                <SignedIn>
+                {typeof window !== 'undefined' && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+                  <>
+                    <SignedOut>
+                      <SignUpButton mode="modal">
+                        <Button
+                          className="w-full mt-6"
+                          variant={plan.popular ? 'default' : 'outline'}
+                          size="lg"
+                        >
+                          {loading === plan.tier ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Starting Trial...
+                            </>
+                          ) : (
+                            plan.buttonText
+                          )}
+                        </Button>
+                      </SignUpButton>
+                    </SignedOut>
+                    <SignedIn>
+                      <Button
+                        className="w-full mt-6"
+                        variant={plan.popular ? 'default' : 'outline'}
+                        size="lg"
+                        onClick={() => handleSubscribe(plan.tier)}
+                        disabled={!!loading}
+                      >
+                        {loading === plan.tier ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Starting Trial...
+                          </>
+                        ) : (
+                          plan.buttonText
+                        )}
+                      </Button>
+                    </SignedIn>
+                  </>
+                ) : (
                   <Button
+                    asChild
                     className="w-full mt-6"
                     variant={plan.popular ? 'default' : 'outline'}
                     size="lg"
-                    onClick={() => handleSubscribe(plan.tier)}
-                    disabled={!!loading}
                   >
-                    {loading === plan.tier ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Starting Trial...
-                      </>
-                    ) : (
-                      plan.buttonText
-                    )}
+                    <Link href="/sign-up">
+                      {plan.buttonText}
+                    </Link>
                   </Button>
-                </SignedIn>
+                )}
               </CardContent>
             </Card>
           ))}

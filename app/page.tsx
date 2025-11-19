@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import React from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,19 +26,34 @@ export default function Component() {
           <Link href="/pricing" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors hidden sm:inline">
             Pricing
           </Link>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
-                Sign In
-              </Button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <Link href="/dashboard" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors">
-              Dashboard
-            </Link>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
+          {typeof window !== 'undefined' && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+            <>
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
+                    Sign In
+                  </Button>
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <Link href="/dashboard" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors">
+                  Dashboard
+                </Link>
+                <UserButton afterSignOutUrl="/" />
+              </SignedIn>
+            </>
+          ) : (
+            <>
+              <Link href="/sign-in">
+                <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
+                  Sign In
+                </Button>
+              </Link>
+              <Link href="/dashboard" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors">
+                Dashboard
+              </Link>
+            </>
+          )}
         </nav>
       </header>
       <main className="flex-1">
@@ -58,25 +75,42 @@ export default function Component() {
                 Experience the future of financial management. Real-time tracking, intelligent insights, and effortless control over your wealth.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 min-[400px]:gap-6 mt-8">
-                <SignedOut>
-                  <SignUpButton mode="modal">
-                    <Button size="lg" className="h-12 px-8 text-base">
-                      Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
+                {typeof window !== 'undefined' && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+                  <>
+                    <SignedOut>
+                      <SignUpButton mode="modal">
+                        <Button size="lg" className="h-12 px-8 text-base">
+                          Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      </SignUpButton>
+                      <SignInButton mode="modal">
+                        <Button variant="outline" size="lg" className="h-12 px-8 text-base backdrop-blur-sm bg-background/50">
+                          Sign In
+                        </Button>
+                      </SignInButton>
+                    </SignedOut>
+                    <SignedIn>
+                      <Button asChild size="lg" className="h-12 px-8 text-base">
+                        <Link href="/dashboard">
+                          Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </SignedIn>
+                  </>
+                ) : (
+                  <>
+                    <Button asChild size="lg" className="h-12 px-8 text-base">
+                      <Link href="/sign-up">
+                        Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
                     </Button>
-                  </SignUpButton>
-                  <SignInButton mode="modal">
-                    <Button variant="outline" size="lg" className="h-12 px-8 text-base backdrop-blur-sm bg-background/50">
-                      Sign In
+                    <Button asChild variant="outline" size="lg" className="h-12 px-8 text-base backdrop-blur-sm bg-background/50">
+                      <Link href="/sign-in">
+                        Sign In
+                      </Link>
                     </Button>
-                  </SignInButton>
-                </SignedOut>
-                <SignedIn>
-                  <Button asChild size="lg" className="h-12 px-8 text-base">
-                    <Link href="/dashboard">
-                      Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </SignedIn>
+                  </>
+                )}
               </div>
             </div>
           </div>

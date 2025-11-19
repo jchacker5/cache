@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,7 +17,7 @@ import Link from "next/link"
 import { Line, LineChart, Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { DataService } from '@/lib/data-service'
-import { useUser } from '@clerk/nextjs'
+import { useSafeUser } from '@/hooks/use-safe-user'
 import { toast } from 'sonner'
 
 interface Account {
@@ -43,7 +45,7 @@ interface CashFlowData {
 }
 
 export default function BalancePage() {
-  const { user } = useUser()
+  const { user } = useSafeUser()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [balanceHistory, setBalanceHistory] = useState<BalanceHistory[]>([])
   const [cashFlowData, setCashFlowData] = useState<CashFlowData[]>([])

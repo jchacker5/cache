@@ -7,8 +7,16 @@ export function ClerkProviderWrapper({
 }: {
   children: React.ReactNode
 }) {
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+  // If no key, don't render ClerkProvider (pages will handle missing user)
+  if (!publishableKey) {
+    return <>{children}</>
+  }
+
   return (
     <ClerkProvider
+      publishableKey={publishableKey}
       appearance={{
         baseTheme: undefined,
         variables: {

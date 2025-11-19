@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { FileText, BarChart3, ShoppingCart, Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, AlertCircle, MessageCircle, Plus, ArrowUpRight, ArrowDownRight, Calendar, CreditCard } from 'lucide-react'
 import { DataService } from '@/lib/data-service'
-import { useUser } from '@clerk/nextjs'
+import { useSafeUser } from '@/hooks/use-safe-user'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -26,7 +28,7 @@ interface DashboardMetrics {
 }
 
 export default function Dashboard() {
-  const { user } = useUser()
+  const { user } = useSafeUser()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

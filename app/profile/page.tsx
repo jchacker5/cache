@@ -1,7 +1,10 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
-import { useUser, UserProfile } from '@clerk/nextjs'
+import { UserProfile } from '@clerk/nextjs'
+import { useSafeUser } from '@/hooks/use-safe-user'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,7 +25,7 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
-  const { user, isLoaded } = useUser()
+  const { user, isLoaded } = useSafeUser()
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [profile, setProfile] = useState<UserProfile>({

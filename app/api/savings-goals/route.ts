@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { client } from '@/lib/convex/server'
+import { api } from '@/convex/_generated/api'
 import { auth } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
@@ -7,14 +8,12 @@ const createSavingsGoalSchema = z.object({
   name: z.string().min(1),
   target_amount: z.number().positive(),
   current_amount: z.number().min(0).default(0),
-  deadline: z.string().optional(), // ISO date string
+  deadline: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high']).default('medium'),
   category: z.string().optional(),
   monthly_contribution: z.number().min(0).default(0),
   description: z.string().optional(),
 })
-
-const updateSavingsGoalSchema = createSavingsGoalSchema.partial()
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,57 +22,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { searchParams } = new URL(request.url)
 
     const completed = searchParams.get('completed')
     const category = searchParams.get('category')
     const priority = searchParams.get('priority')
 
-    let query = supabase
-      .from('savings_goals')
-      .select('*')
-      .eq('user_id', userId)
-
-    if (completed === 'true') {
-      query = query.eq('is_completed', true)
-    } else if (completed === 'false') {
-      query = query.eq('is_completed', false)
-    }
-
-    if (category) {
-      query = query.eq('category', category)
-    }
-
-    if (priority) {
-      query = query.eq('priority', priority)
-    }
-
-    const { data: goals, error } = await query.order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching savings goals:', error)
-      return NextResponse.json({ error: 'Failed to fetch savings goals' }, { status: 500 })
-    }
-
-    // Calculate progress and additional metrics for each goal
-    const goalsWithMetrics = goals.map(goal => {
-      const progress = (goal.current_amount / goal.target_amount) * 100
-      const remaining = goal.target_amount - goal.current_amount
-      const monthsToGoal = remaining > 0 && goal.monthly_contribution > 0
-        ? Math.ceil(remaining / goal.monthly_contribution)
-        : 0
-
-      return {
-        ...goal,
-        progress,
-        remaining,
-        months_to_goal: monthsToGoal,
-        is_overdue: goal.deadline && new Date(goal.deadline) < new Date() && !goal.is_completed,
-      }
+    const goals = await client.query(api.savingsGoals.list, {
+      userId,
+      completed: completed ? completed as 'true' | 'false' : undefined,
+      category: category || undefined,
+      priority: priority ? priority as 'low' | 'medium' | 'high' : undefined,
     })
 
-    return NextResponse.json(goalsWithMetrics)
+    return NextResponse.json(goals)
   } catch (error) {
     console.error('Savings goals API error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -87,37 +49,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const body = await request.json()
 
     // Validate input
     const validatedData = createSavingsGoalSchema.parse(body)
 
     // Create savings goal
-    const { data: goal, error } = await supabase
-      .from('savings_goals')
-      .insert({
-        user_id: userId,
-        ...validatedData,
-      })
-      .select()
-      .single()
+    const goalId = await client.mutation(api.savingsGoals.create, {
+      userId,
+      name: validatedData.name,
+      targetAmount: validatedData.target_amount,
+      currentAmount: validatedData.current_amount,
+      deadline: validatedData.deadline,
+      priority: validatedData.priority,
+      category: validatedData.category,
+      monthlyContribution: validatedData.monthly_contribution,
+      description: validatedData.description,
+    })
 
-    if (error) {
-      console.error('Error creating savings goal:', error)
-      return NextResponse.json({ error: 'Failed to create savings goal' }, { status: 500 })
-    }
+    const goal = await client.query(api.savingsGoals.get, { id: goalId })
 
-    // Calculate initial metrics
-    const progress = (goal.current_amount / goal.target_amount) * 100
-    const remaining = goal.target_amount - goal.current_amount
-
-    return NextResponse.json({
-      ...goal,
-      progress,
-      remaining,
-      months_to_goal: goal.monthly_contribution > 0 ? Math.ceil(remaining / goal.monthly_contribution) : 0,
-    }, { status: 201 })
+    return NextResponse.json(goal, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })

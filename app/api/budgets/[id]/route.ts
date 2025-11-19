@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { client } from '@/lib/convex/server'
+import { api } from '@/convex/_generated/api'
 import { auth } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
@@ -23,47 +24,14 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = params
 
-    const { data: budget, error } = await supabase
-      .from('budgets')
-      .select(`
-        *,
-        categories(name, icon, color)
-      `)
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Budget not found' }, { status: 404 })
-      }
-      console.error('Error fetching budget:', error)
-      return NextResponse.json({ error: 'Failed to fetch budget' }, { status: 500 })
+    const budget = await client.query(api.budgets.get, { id: id as any })
+    if (!budget || budget.userId !== userId) {
+      return NextResponse.json({ error: 'Budget not found' }, { status: 404 })
     }
 
-    // Calculate current spending
-    const { data: spending, error: spendingError } = await supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', userId)
-      .eq('category_id', budget.category_id)
-      .eq('type', 'expense')
-      .gte('date', budget.start_date)
-      .lte('date', budget.end_date || new Date().toISOString().split('T')[0])
-
-    const currentSpending = spendingError
-      ? 0
-      : spending.reduce((sum, t) => sum + Math.abs(t.amount), 0)
-
-    return NextResponse.json({
-      ...budget,
-      current_spending: currentSpending,
-      remaining: budget.amount - currentSpending,
-      percentage_used: (currentSpending / budget.amount) * 100,
-    })
+    return NextResponse.json(budget)
   } catch (error) {
     console.error('Budget fetch error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -80,7 +48,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = params
     const body = await request.json()
 
@@ -88,33 +55,24 @@ export async function PUT(
     const validatedData = updateBudgetSchema.parse(body)
 
     // Verify budget exists and belongs to user
-    const { data: existingBudget, error: fetchError } = await supabase
-      .from('budgets')
-      .select('id')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-
-    if (fetchError || !existingBudget) {
+    const existingBudget = await client.query(api.budgets.get, { id: id as any })
+    if (!existingBudget || existingBudget.userId !== userId) {
       return NextResponse.json({ error: 'Budget not found' }, { status: 404 })
     }
 
     // Update budget
-    const { data: budget, error } = await supabase
-      .from('budgets')
-      .update(validatedData)
-      .eq('id', id)
-      .eq('user_id', userId)
-      .select(`
-        *,
-        categories(name, icon, color)
-      `)
-      .single()
+    await client.mutation(api.budgets.update, {
+      id: id as any,
+      name: validatedData.name,
+      amount: validatedData.amount,
+      period: validatedData.period,
+      startDate: validatedData.start_date,
+      endDate: validatedData.end_date,
+      alertThreshold: validatedData.alert_threshold,
+      isActive: validatedData.is_active,
+    })
 
-    if (error) {
-      console.error('Error updating budget:', error)
-      return NextResponse.json({ error: 'Failed to update budget' }, { status: 500 })
-    }
+    const budget = await client.query(api.budgets.get, { id: id as any })
 
     return NextResponse.json(budget)
   } catch (error) {
@@ -137,20 +95,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = params
 
-    // Delete budget
-    const { error } = await supabase
-      .from('budgets')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userId)
-
-    if (error) {
-      console.error('Error deleting budget:', error)
-      return NextResponse.json({ error: 'Failed to delete budget' }, { status: 500 })
+    // Verify budget exists and belongs to user
+    const budget = await client.query(api.budgets.get, { id: id as any })
+    if (!budget || budget.userId !== userId) {
+      return NextResponse.json({ error: 'Budget not found' }, { status: 404 })
     }
+
+    // Delete budget
+    await client.mutation(api.budgets.remove, { id: id as any })
 
     return NextResponse.json({ success: true })
   } catch (error) {

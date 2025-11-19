@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { client } from '@/lib/convex/server'
+import { api } from '@/convex/_generated/api'
 import { auth } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
 const updateTransactionSchema = z.object({
-  account_id: z.string().uuid().optional(),
-  category_id: z.string().uuid().optional(),
+  account_id: z.string().optional(),
+  category_id: z.string().optional(),
   description: z.string().min(1).optional(),
   merchant: z.string().optional(),
   amount: z.number().positive().optional(),
@@ -25,26 +26,11 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = params
 
-    const { data: transaction, error } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        accounts(name, type, currency),
-        categories(name, icon, color)
-      `)
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
-      }
-      console.error('Error fetching transaction:', error)
-      return NextResponse.json({ error: 'Failed to fetch transaction' }, { status: 500 })
+    const transaction = await client.query(api.transactions.get, { id: id as any })
+    if (!transaction || transaction.userId !== userId) {
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
     }
 
     return NextResponse.json(transaction)
@@ -64,7 +50,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = params
     const body = await request.json()
 
@@ -72,62 +57,42 @@ export async function PUT(
     const validatedData = updateTransactionSchema.parse(body)
 
     // Verify transaction exists and belongs to user
-    const { data: existingTransaction, error: fetchError } = await supabase
-      .from('transactions')
-      .select('id')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-
-    if (fetchError || !existingTransaction) {
+    const existingTransaction = await client.query(api.transactions.get, { id: id as any })
+    if (!existingTransaction || existingTransaction.userId !== userId) {
       return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
     }
 
     // If account_id is being updated, verify it belongs to user
     if (validatedData.account_id) {
-      const { data: account, error: accountError } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('id', validatedData.account_id)
-        .eq('user_id', userId)
-        .single()
-
-      if (accountError || !account) {
+      const account = await client.query(api.accounts.get, { id: validatedData.account_id as any })
+      if (!account || account.userId !== userId) {
         return NextResponse.json({ error: 'Invalid account' }, { status: 400 })
       }
     }
 
     // If category_id is being updated, verify it belongs to user
     if (validatedData.category_id) {
-      const { data: category, error: categoryError } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('id', validatedData.category_id)
-        .eq('user_id', userId)
-        .single()
-
-      if (categoryError || !category) {
+      const category = await client.query(api.categories.get, { id: validatedData.category_id as any })
+      if (!category || category.userId !== userId) {
         return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
       }
     }
 
     // Update transaction
-    const { data: transaction, error } = await supabase
-      .from('transactions')
-      .update(validatedData)
-      .eq('id', id)
-      .eq('user_id', userId)
-      .select(`
-        *,
-        accounts(name, type, currency),
-        categories(name, icon, color)
-      `)
-      .single()
+    await client.mutation(api.transactions.update, {
+      id: id as any,
+      accountId: validatedData.account_id,
+      categoryId: validatedData.category_id,
+      description: validatedData.description,
+      merchant: validatedData.merchant,
+      amount: validatedData.amount ? (validatedData.type === 'expense' ? -validatedData.amount : validatedData.amount) : undefined,
+      type: validatedData.type,
+      date: validatedData.date,
+      notes: validatedData.notes,
+      tags: validatedData.tags,
+    })
 
-    if (error) {
-      console.error('Error updating transaction:', error)
-      return NextResponse.json({ error: 'Failed to update transaction' }, { status: 500 })
-    }
+    const transaction = await client.query(api.transactions.get, { id: id as any })
 
     return NextResponse.json(transaction)
   } catch (error) {
@@ -150,20 +115,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = params
 
-    // Delete transaction (this will also update budget spending via trigger)
-    const { error } = await supabase
-      .from('transactions')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userId)
-
-    if (error) {
-      console.error('Error deleting transaction:', error)
-      return NextResponse.json({ error: 'Failed to delete transaction' }, { status: 500 })
+    // Verify transaction exists and belongs to user
+    const transaction = await client.query(api.transactions.get, { id: id as any })
+    if (!transaction || transaction.userId !== userId) {
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
     }
+
+    // Delete transaction
+    await client.mutation(api.transactions.remove, { id: id as any })
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { client } from '@/lib/convex/server'
+import { api } from '@/convex/_generated/api'
 import { auth } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
@@ -30,46 +31,14 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = await params
 
-    const { data: goal, error } = await supabase
-      .from('savings_goals')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Savings goal not found' }, { status: 404 })
-      }
-      console.error('Error fetching savings goal:', error)
-      return NextResponse.json({ error: 'Failed to fetch savings goal' }, { status: 500 })
+    const goal = await client.query(api.savingsGoals.get, { id: id as any })
+    if (!goal || goal.userId !== userId) {
+      return NextResponse.json({ error: 'Savings goal not found' }, { status: 404 })
     }
 
-    // Get contribution history
-    const { data: contributions, error: contributionsError } = await supabase
-      .from('savings_contributions')
-      .select('*')
-      .eq('savings_goal_id', id)
-      .order('date', { ascending: false })
-
-    // Calculate metrics
-    const progress = (goal.current_amount / goal.target_amount) * 100
-    const remaining = goal.target_amount - goal.current_amount
-    const monthsToGoal = remaining > 0 && goal.monthly_contribution > 0
-      ? Math.ceil(remaining / goal.monthly_contribution)
-      : 0
-
-    return NextResponse.json({
-      ...goal,
-      progress,
-      remaining,
-      months_to_goal: monthsToGoal,
-      is_overdue: goal.deadline && new Date(goal.deadline) < new Date() && !goal.is_completed,
-      contributions: contributions || [],
-    })
+    return NextResponse.json(goal)
   } catch (error) {
     console.error('Savings goal fetch error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -86,7 +55,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = await params
     const body = await request.json()
 
@@ -94,30 +62,26 @@ export async function PUT(
     const validatedData = updateSavingsGoalSchema.parse(body)
 
     // Verify savings goal exists and belongs to user
-    const { data: existingGoal, error: fetchError } = await supabase
-      .from('savings_goals')
-      .select('id')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-
-    if (fetchError || !existingGoal) {
+    const existingGoal = await client.query(api.savingsGoals.get, { id: id as any })
+    if (!existingGoal || existingGoal.userId !== userId) {
       return NextResponse.json({ error: 'Savings goal not found' }, { status: 404 })
     }
 
     // Update savings goal
-    const { data: goal, error } = await supabase
-      .from('savings_goals')
-      .update(validatedData)
-      .eq('id', id)
-      .eq('user_id', userId)
-      .select()
-      .single()
+    await client.mutation(api.savingsGoals.update, {
+      id: id as any,
+      name: validatedData.name,
+      targetAmount: validatedData.target_amount,
+      currentAmount: validatedData.current_amount,
+      deadline: validatedData.deadline,
+      priority: validatedData.priority,
+      category: validatedData.category,
+      monthlyContribution: validatedData.monthly_contribution,
+      description: validatedData.description,
+      isCompleted: validatedData.is_completed,
+    })
 
-    if (error) {
-      console.error('Error updating savings goal:', error)
-      return NextResponse.json({ error: 'Failed to update savings goal' }, { status: 500 })
-    }
+    const goal = await client.query(api.savingsGoals.get, { id: id as any })
 
     return NextResponse.json(goal)
   } catch (error) {
@@ -140,20 +104,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = await params
 
-    // Delete savings goal (this will cascade to contributions)
-    const { error } = await supabase
-      .from('savings_goals')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userId)
-
-    if (error) {
-      console.error('Error deleting savings goal:', error)
-      return NextResponse.json({ error: 'Failed to delete savings goal' }, { status: 500 })
+    // Verify savings goal exists and belongs to user
+    const goal = await client.query(api.savingsGoals.get, { id: id as any })
+    if (!goal || goal.userId !== userId) {
+      return NextResponse.json({ error: 'Savings goal not found' }, { status: 404 })
     }
+
+    // Delete savings goal
+    await client.mutation(api.savingsGoals.remove, { id: id as any })
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -173,7 +133,6 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = await params
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action')
@@ -183,50 +142,23 @@ export async function POST(
       const validatedData = contributeSchema.parse(body)
 
       // Verify savings goal exists and belongs to user
-      const { data: goal, error: fetchError } = await supabase
-        .from('savings_goals')
-        .select('id, current_amount')
-        .eq('id', id)
-        .eq('user_id', userId)
-        .single()
-
-      if (fetchError || !goal) {
+      const goal = await client.query(api.savingsGoals.get, { id: id as any })
+      if (!goal || goal.userId !== userId) {
         return NextResponse.json({ error: 'Savings goal not found' }, { status: 404 })
       }
 
       // Add contribution
-      const { data: contribution, error: contributionError } = await supabase
-        .from('savings_contributions')
-        .insert({
-          user_id: userId,
-          savings_goal_id: id,
-          amount: validatedData.amount,
-          date: new Date().toISOString().split('T')[0],
-          notes: validatedData.notes,
-        })
-        .select()
-        .single()
+      await client.mutation(api.savingsGoals.addContribution, {
+        goalId: id as any,
+        userId,
+        amount: validatedData.amount,
+        date: new Date().toISOString().split('T')[0],
+        notes: validatedData.notes,
+      })
 
-      if (contributionError) {
-        console.error('Error adding contribution:', contributionError)
-        return NextResponse.json({ error: 'Failed to add contribution' }, { status: 500 })
-      }
+      const updatedGoal = await client.query(api.savingsGoals.get, { id: id as any })
 
-      // Update savings goal current amount
-      const { error: updateError } = await supabase
-        .from('savings_goals')
-        .update({
-          current_amount: goal.current_amount + validatedData.amount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-
-      if (updateError) {
-        console.error('Error updating savings goal amount:', updateError)
-        return NextResponse.json({ error: 'Failed to update savings goal' }, { status: 500 })
-      }
-
-      return NextResponse.json(contribution, { status: 201 })
+      return NextResponse.json(updatedGoal, { status: 201 })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

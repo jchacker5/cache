@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
 import { ClerkProviderWrapper } from '@/components/providers/clerk-provider'
+import { ConvexClientProvider } from './ConvexClientProvider'
 import { Toaster } from 'sonner'
 import './globals.css'
 
@@ -32,10 +33,12 @@ html {
         `}</style>
       </head>
       <body>
-        <ClerkProviderWrapper>
-          {children}
-          <Toaster position="top-right" richColors />
-        </ClerkProviderWrapper>
+        <ConvexClientProvider>
+          <ClerkProviderWrapper>
+            {children}
+            <Toaster position="top-right" richColors />
+          </ClerkProviderWrapper>
+        </ConvexClientProvider>
         <Analytics />
       </body>
     </html>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { client } from '@/lib/convex/server'
+import { api } from '@/convex/_generated/api'
 import { auth } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
@@ -23,31 +24,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { searchParams } = new URL(request.url)
 
     const type = searchParams.get('type')
     const activeOnly = searchParams.get('activeOnly') !== 'false'
 
-    let query = supabase
-      .from('accounts')
-      .select('*')
-      .eq('user_id', userId)
-
-    if (type) {
-      query = query.eq('type', type)
-    }
-
-    if (activeOnly) {
-      query = query.eq('is_active', true)
-    }
-
-    const { data: accounts, error } = await query.order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching accounts:', error)
-      return NextResponse.json({ error: 'Failed to fetch accounts' }, { status: 500 })
-    }
+    const accounts = await client.query(api.accounts.list, {
+      userId,
+      type: type ? type as 'checking' | 'savings' | 'credit' | 'investment' : undefined,
+      activeOnly: activeOnly,
+    })
 
     // Calculate additional metrics for each account
     const accountsWithMetrics = accounts.map(account => {
@@ -76,26 +62,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const body = await request.json()
 
     // Validate input
     const validatedData = createAccountSchema.parse(body)
 
     // Create account
-    const { data: account, error } = await supabase
-      .from('accounts')
-      .insert({
-        user_id: userId,
-        ...validatedData,
-      })
-      .select()
-      .single()
+    const accountId = await client.mutation(api.accounts.create, {
+      userId,
+      name: validatedData.name,
+      type: validatedData.type,
+      balance: validatedData.balance,
+      currency: validatedData.currency,
+      institution: validatedData.institution,
+      accountNumber: validatedData.account_number,
+      lastFour: validatedData.last_four,
+      isActive: validatedData.is_active,
+    })
 
-    if (error) {
-      console.error('Error creating account:', error)
-      return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
-    }
+    const account = await client.query(api.accounts.get, { id: accountId })
 
     return NextResponse.json(account, { status: 201 })
   } catch (error) {

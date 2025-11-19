@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,7 +16,7 @@ import { Mountain, Menu, Bell, Settings, User, Plus, Edit, Trash2, ShoppingCart,
 import Link from "next/link"
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { ChartContainer } from "@/components/ui/chart"
-import { useUser } from '@clerk/nextjs'
+import { useSafeUser } from '@/hooks/use-safe-user'
 import { toast } from 'sonner'
 import { DataService } from '@/lib/data-service'
 
@@ -43,7 +45,7 @@ interface Category {
 }
 
 export default function BudgetsPage() {
-  const { user } = useUser()
+  const { user } = useSafeUser()
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -697,12 +699,12 @@ export default function BudgetsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Highest Spend Category</span>
-                  <span className="text-sm font-semibold">{budgets.sort((a, b) => b.spent - a.spent)[0].name}</span>
+                  <span className="text-sm font-semibold">{budgets.length > 0 ? budgets.sort((a, b) => b.spent - a.spent)[0]?.name || 'N/A' : 'N/A'}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Most Efficient Category</span>
                   <span className="text-sm font-semibold">
-                    {budgets.sort((a, b) => (a.spent / a.budget) - (b.spent / b.budget))[0].name}
+                    {budgets.length > 0 ? budgets.sort((a, b) => (a.spent / a.budget) - (b.spent / b.budget))[0]?.name || 'N/A' : 'N/A'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

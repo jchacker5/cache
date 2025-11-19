@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { client } from '@/lib/convex/server'
+import { api } from '@/convex/_generated/api'
 import { auth } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
@@ -24,42 +25,23 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = params
 
-    const { data: account, error } = await supabase
-      .from('accounts')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Account not found' }, { status: 404 })
-      }
-      console.error('Error fetching account:', error)
-      return NextResponse.json({ error: 'Failed to fetch account' }, { status: 500 })
+    const account = await client.query(api.accounts.get, { id: id as any })
+    if (!account || account.userId !== userId) {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
 
     // Get recent transactions for this account
-    const { data: transactions, error: transactionsError } = await supabase
-      .from('transactions')
-      .select(`
-        id,
-        description,
-        amount,
-        type,
-        date,
-        categories(name, icon, color)
-      `)
-      .eq('account_id', id)
-      .order('date', { ascending: false })
-      .limit(10)
+    const transactions = await client.query(api.transactions.list, {
+      userId,
+      accountId: id,
+      limit: 10,
+    })
 
     return NextResponse.json({
       ...account,
-      recent_transactions: transactions || [],
+      recent_transactions: transactions.transactions || [],
     })
   } catch (error) {
     console.error('Account fetch error:', error)
@@ -77,7 +59,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = params
     const body = await request.json()
 
@@ -85,30 +66,25 @@ export async function PUT(
     const validatedData = updateAccountSchema.parse(body)
 
     // Verify account exists and belongs to user
-    const { data: existingAccount, error: fetchError } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-
-    if (fetchError || !existingAccount) {
+    const existingAccount = await client.query(api.accounts.get, { id: id as any })
+    if (!existingAccount || existingAccount.userId !== userId) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
 
     // Update account
-    const { data: account, error } = await supabase
-      .from('accounts')
-      .update(validatedData)
-      .eq('id', id)
-      .eq('user_id', userId)
-      .select()
-      .single()
+    await client.mutation(api.accounts.update, {
+      id: id as any,
+      name: validatedData.name,
+      type: validatedData.type,
+      balance: validatedData.balance,
+      currency: validatedData.currency,
+      institution: validatedData.institution,
+      accountNumber: validatedData.account_number,
+      lastFour: validatedData.last_four,
+      isActive: validatedData.is_active,
+    })
 
-    if (error) {
-      console.error('Error updating account:', error)
-      return NextResponse.json({ error: 'Failed to update account' }, { status: 500 })
-    }
+    const account = await client.query(api.accounts.get, { id: id as any })
 
     return NextResponse.json(account)
   } catch (error) {
@@ -131,23 +107,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient()
     const { id } = params
 
-    // Check if account has transactions
-    const { data: transactions, error: checkError } = await supabase
-      .from('transactions')
-      .select('id')
-      .eq('account_id', id)
-      .eq('user_id', userId)
-      .limit(1)
-
-    if (checkError) {
-      console.error('Error checking for transactions:', checkError)
-      return NextResponse.json({ error: 'Failed to check account' }, { status: 500 })
+    // Verify account exists and belongs to user
+    const account = await client.query(api.accounts.get, { id: id as any })
+    if (!account || account.userId !== userId) {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
 
-    if (transactions && transactions.length > 0) {
+    // Check if account has transactions
+    const transactions = await client.query(api.transactions.list, {
+      userId,
+      accountId: id,
+      limit: 1,
+    })
+
+    if (transactions.transactions && transactions.transactions.length > 0) {
       return NextResponse.json(
         { error: 'Cannot delete account with existing transactions. Transfer or delete transactions first.' },
         { status: 400 }
@@ -155,16 +130,7 @@ export async function DELETE(
     }
 
     // Delete account
-    const { error } = await supabase
-      .from('accounts')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userId)
-
-    if (error) {
-      console.error('Error deleting account:', error)
-      return NextResponse.json({ error: 'Failed to delete account' }, { status: 500 })
-    }
+    await client.mutation(api.accounts.remove, { id: id as any })
 
     return NextResponse.json({ success: true })
   } catch (error) {

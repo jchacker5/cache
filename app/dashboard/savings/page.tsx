@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,7 +16,7 @@ import { Mountain, Menu, Bell, Settings, User, Plus, Edit, Trash2, Target, HomeI
 import Link from "next/link"
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { useUser } from '@clerk/nextjs'
+import { useSafeUser } from '@/hooks/use-safe-user'
 import { toast } from 'sonner'
 
 interface SavingsGoal {
@@ -36,7 +38,7 @@ interface SavingsGoal {
 }
 
 export default function SavingsPage() {
-  const { user } = useUser()
+  const { user } = useSafeUser()
   const [goals, setGoals] = useState<SavingsGoal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
