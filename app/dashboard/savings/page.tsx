@@ -1,0 +1,603 @@
+'use client'
+
+import { useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Mountain, Menu, Bell, Settings, User, Plus, Edit, Trash2, Target, HomeIcon, Car, Plane, GraduationCap, TrendingUp, Calendar, DollarSign, Check, AlertCircle } from 'lucide-react'
+import Link from "next/link"
+import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart } from 'recharts'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+
+const initialGoals = [
+  { 
+    id: 1, 
+    name: 'Emergency Fund', 
+    target: 10000, 
+    current: 8420, 
+    deadline: '2025-12-31', 
+    icon: Target, 
+    color: '#3b82f6',
+    category: 'essential',
+    monthlyContribution: 450
+  },
+  { 
+    id: 2, 
+    name: 'House Down Payment', 
+    target: 50000, 
+    current: 22500, 
+    deadline: '2027-06-30', 
+    icon: HomeIcon, 
+    color: '#8b5cf6',
+    category: 'major',
+    monthlyContribution: 1200
+  },
+  { 
+    id: 3, 
+    name: 'New Car', 
+    target: 25000, 
+    current: 5800, 
+    deadline: '2026-03-31', 
+    icon: Car, 
+    color: '#ec4899',
+    category: 'major',
+    monthlyContribution: 800
+  },
+  { 
+    id: 4, 
+    name: 'Vacation Fund', 
+    target: 5000, 
+    current: 2100, 
+    deadline: '2025-08-01', 
+    icon: Plane, 
+    color: '#10b981',
+    category: 'lifestyle',
+    monthlyContribution: 300
+  },
+  { 
+    id: 5, 
+    name: 'Education Fund', 
+    target: 15000, 
+    current: 4200, 
+    deadline: '2026-09-01', 
+    icon: GraduationCap, 
+    color: '#f59e0b',
+    category: 'education',
+    monthlyContribution: 500
+  },
+]
+
+const savingsHistory = [
+  { month: 'Jan', total: 38000 },
+  { month: 'Feb', total: 40500 },
+  { month: 'Mar', total: 42200 },
+  { month: 'Apr', total: 43800 },
+  { month: 'May', total: 45900 },
+  { month: 'Jun', total: 48020 },
+]
+
+const projectionData = [
+  { month: 'Now', actual: 48020, projected: 48020 },
+  { month: 'Jul', projected: 51270 },
+  { month: 'Aug', projected: 54520 },
+  { month: 'Sep', projected: 57770 },
+  { month: 'Oct', projected: 61020 },
+  { month: 'Nov', projected: 64270 },
+  { month: 'Dec', projected: 67520 },
+]
+
+export default function SavingsPage() {
+  const [goals, setGoals] = useState(initialGoals)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isContributeOpen, setIsContributeOpen] = useState(false)
+  const [selectedGoal, setSelectedGoal] = useState<typeof initialGoals[0] | null>(null)
+
+  const totalTarget = goals.reduce((sum, g) => sum + g.target, 0)
+  const totalSaved = goals.reduce((sum, g) => sum + g.current, 0)
+  const totalProgress = (totalSaved / totalTarget) * 100
+  const totalMonthlyContribution = goals.reduce((sum, g) => sum + g.monthlyContribution, 0)
+
+  const goalsAchieved = goals.filter(g => g.current >= g.target).length
+  const goalsInProgress = goals.filter(g => g.current < g.target).length
+
+  const deleteGoal = (id: number) => {
+    setGoals(goals.filter(g => g.id !== id))
+  }
+
+  const contributeToGoal = (goalId: number, amount: number) => {
+    setGoals(goals.map(g => g.id === goalId ? { ...g, current: g.current + amount } : g))
+  }
+
+  const getDaysRemaining = (deadline: string) => {
+    const today = new Date()
+    const target = new Date(deadline)
+    const diff = target.getTime() - today.getTime()
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  }
+
+  const getStatusColor = (current: number, target: number) => {
+    const percentage = (current / target) * 100
+    if (percentage >= 100) return 'default'
+    if (percentage >= 75) return 'default'
+    if (percentage >= 50) return 'secondary'
+    return 'outline'
+  }
+
+  const getStatusText = (current: number, target: number) => {
+    const percentage = (current / target) * 100
+    if (percentage >= 100) return 'Completed'
+    if (percentage >= 75) return 'Almost There'
+    if (percentage >= 50) return 'In Progress'
+    return 'Started'
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-14 sm:h-16 items-center justify-between px-4">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <Link href="/" className="flex items-center gap-2">
+              <Mountain className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="font-bold text-lg sm:text-xl">Cache</span>
+            </Link>
+            <nav className="hidden md:flex gap-6">
+              <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+                Dashboard
+              </Link>
+              <Link href="/dashboard/transactions" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+                Transactions
+              </Link>
+              <Link href="/dashboard/budgets" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+                Budgets
+              </Link>
+              <Link href="/dashboard/reports" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+                Reports
+              </Link>
+              <Link href="/dashboard/savings" className="text-sm font-medium text-foreground">
+                Savings
+              </Link>
+            </nav>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10">
+              <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 hidden sm:flex">
+              <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 hidden sm:flex">
+              <User className="h-4 w-4 sm:h-5 sm:w-5" />
+            </Button>
+            <Sheet>
+              <SheetTrigger asChild className="md:hidden">
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[280px]">
+                <nav className="flex flex-col gap-4 mt-8">
+                  <Link href="/dashboard" className="text-sm font-medium px-2 py-2 hover:bg-muted rounded-md">
+                    Dashboard
+                  </Link>
+                  <Link href="/dashboard/transactions" className="text-sm font-medium px-2 py-2 hover:bg-muted rounded-md">
+                    Transactions
+                  </Link>
+                  <Link href="/dashboard/budgets" className="text-sm font-medium px-2 py-2 hover:bg-muted rounded-md">
+                    Budgets
+                  </Link>
+                  <Link href="/dashboard/reports" className="text-sm font-medium px-2 py-2 hover:bg-muted rounded-md">
+                    Reports
+                  </Link>
+                  <Link href="/dashboard/savings" className="text-sm font-medium px-2 py-2 rounded-md bg-muted">
+                    Savings Goals
+                  </Link>
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
+        </div>
+      </header>
+
+      <main className="container px-4 py-4 sm:py-6 md:py-8">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Savings Goals</h1>
+            <p className="text-sm text-muted-foreground mt-1">Track and achieve your financial goals</p>
+          </div>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Goal
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create Savings Goal</DialogTitle>
+                <DialogDescription>Set a new financial goal to track</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="goal-name">Goal Name</Label>
+                  <Input id="goal-name" placeholder="e.g., Vacation Fund" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="goal-target">Target Amount</Label>
+                  <Input id="goal-target" type="number" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="goal-current">Current Savings</Label>
+                  <Input id="goal-current" type="number" placeholder="0.00" defaultValue="0" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="goal-deadline">Target Date</Label>
+                  <Input id="goal-deadline" type="date" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="goal-monthly">Monthly Contribution</Label>
+                  <Input id="goal-monthly" type="number" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="goal-category">Category</Label>
+                  <Select defaultValue="lifestyle">
+                    <SelectTrigger id="goal-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="essential">Essential</SelectItem>
+                      <SelectItem value="major">Major Purchase</SelectItem>
+                      <SelectItem value="lifestyle">Lifestyle</SelectItem>
+                      <SelectItem value="education">Education</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <Button className="flex-1" onClick={() => setIsAddDialogOpen(false)}>Create Goal</Button>
+                  <Button variant="outline" className="flex-1" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Overview Cards */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Saved</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">${totalSaved.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground mt-1">{totalProgress.toFixed(1)}% of target</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Target</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${totalTarget.toLocaleString()}</div>
+              <Progress value={totalProgress} className="mt-2" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Goals Achieved</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{goalsAchieved}</div>
+              <p className="text-xs text-muted-foreground mt-1">{goalsInProgress} in progress</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Contribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${totalMonthlyContribution.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground mt-1">Across all goals</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-7">
+          {/* Left Column - Goals List */}
+          <div className="lg:col-span-4 space-y-4">
+            {goals.map((goal) => {
+              const percentage = (goal.current / goal.target) * 100
+              const remaining = goal.target - goal.current
+              const Icon = goal.icon
+              const daysRemaining = getDaysRemaining(goal.deadline)
+              const isCompleted = goal.current >= goal.target
+              const monthsToGoal = remaining / goal.monthlyContribution
+              
+              return (
+                <Card key={goal.id} className={isCompleted ? 'border-green-500 border-2' : ''}>
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="p-3 rounded-lg flex-shrink-0" style={{ backgroundColor: `${goal.color}20` }}>
+                            <Icon className="h-6 w-6" style={{ color: goal.color }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <h3 className="font-bold text-base sm:text-lg">{goal.name}</h3>
+                              <Badge variant={getStatusColor(goal.current, goal.target)}>
+                                {getStatusText(goal.current, goal.target)}
+                              </Badge>
+                              {isCompleted && (
+                                <Badge className="bg-green-600">
+                                  <Check className="h-3 w-3 mr-1" />
+                                  Achieved
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <span className="text-xl sm:text-2xl font-bold">${goal.current.toLocaleString()}</span>
+                              <span className="text-sm text-muted-foreground">of ${goal.target.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => {
+                              setSelectedGoal(goal)
+                              setIsContributeOpen(true)
+                            }}
+                          >
+                            <DollarSign className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteGoal(goal.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Progress value={percentage} className="h-3" />
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
+                          <span className="text-muted-foreground">{percentage.toFixed(1)}% completed</span>
+                          <span className={remaining > 0 ? 'text-amber-600 font-medium' : 'text-green-600 font-medium'}>
+                            {remaining > 0 ? `$${remaining.toLocaleString()} to go` : 'Goal Achieved!'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 p-3 rounded-lg bg-muted/50">
+                        <div>
+                          <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                            <Calendar className="h-3.5 w-3.5" />
+                            <span className="text-xs">Target Date</span>
+                          </div>
+                          <p className="text-sm font-semibold">{new Date(goal.deadline).toLocaleDateString()}</p>
+                          <p className="text-xs text-muted-foreground">{daysRemaining > 0 ? `${daysRemaining} days left` : 'Past due'}</p>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                            <DollarSign className="h-3.5 w-3.5" />
+                            <span className="text-xs">Monthly</span>
+                          </div>
+                          <p className="text-sm font-semibold">${goal.monthlyContribution}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {!isCompleted && monthsToGoal > 0 ? `${Math.ceil(monthsToGoal)} months` : 'Completed'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {!isCompleted && daysRemaining < 90 && remaining > 0 && (
+                        <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
+                          <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-amber-800">
+                            You need to save ${(remaining / (daysRemaining / 30)).toFixed(0)}/month to reach this goal on time.
+                          </p>
+                        </div>
+                      )}
+
+                      {isCompleted && (
+                        <div className="flex items-start gap-2 p-3 rounded-md bg-green-50 border border-green-200">
+                          <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-green-800">
+                            Congratulations! You've achieved this savings goal. Consider setting a new goal.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Right Column - Analytics */}
+          <div className="lg:col-span-3 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Savings Growth</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Total savings over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    total: {
+                      label: "Total Savings",
+                      color: "hsl(var(--chart-3))",
+                    },
+                  }}
+                  className="h-[200px] sm:h-[250px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={savingsHistory}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Area type="monotone" dataKey="total" stroke="var(--color-total)" fill="var(--color-total)" fillOpacity={0.6} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Savings Projection</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Estimated future savings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    actual: {
+                      label: "Actual",
+                      color: "hsl(var(--chart-1))",
+                    },
+                    projected: {
+                      label: "Projected",
+                      color: "hsl(var(--chart-2))",
+                    },
+                  }}
+                  className="h-[200px] sm:h-[250px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={projectionData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Line type="monotone" dataKey="actual" stroke="var(--color-actual)" strokeWidth={2} dot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="projected" stroke="var(--color-projected)" strokeWidth={2} strokeDasharray="5 5" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  Based on current monthly contributions of ${totalMonthlyContribution}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Insights</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Smart recommendations</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {goalsAchieved > 0 && (
+                  <div className="p-3 sm:p-4 rounded-lg bg-green-50 border border-green-200">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-green-900">Great Progress!</p>
+                        <p className="text-xs text-green-700 mt-1">
+                          You've achieved {goalsAchieved} {goalsAchieved === 1 ? 'goal' : 'goals'}. Keep up the excellent work!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="p-3 sm:p-4 rounded-lg bg-blue-50 border border-blue-200">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-blue-900">Savings Tip</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        You're contributing ${totalMonthlyContribution}/month. Consider increasing by 10% to reach goals faster.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 sm:p-4 rounded-lg bg-purple-50 border border-purple-200">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <Target className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-purple-900">On Track</p>
+                      <p className="text-xs text-purple-700 mt-1">
+                        Based on current contributions, you'll reach your emergency fund goal in {Math.ceil((10000 - 8420) / 450)} months.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Quick Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Average Goal Progress</span>
+                  <span className="text-sm font-semibold">
+                    {(goals.reduce((sum, g) => sum + (g.current / g.target) * 100, 0) / goals.length).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Closest to Completion</span>
+                  <span className="text-sm font-semibold">
+                    {goals.sort((a, b) => (b.current / b.target) - (a.current / a.target))[0].name}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total Remaining</span>
+                  <span className="text-sm font-semibold">
+                    ${(totalTarget - totalSaved).toLocaleString()}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </main>
+
+      {/* Contribute Dialog */}
+      <Dialog open={isContributeOpen} onOpenChange={setIsContributeOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Contribution</DialogTitle>
+            <DialogDescription>
+              Add money to {selectedGoal?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="contribution-amount">Amount</Label>
+              <Input id="contribution-amount" type="number" placeholder="0.00" />
+            </div>
+            <div className="p-4 rounded-lg bg-muted">
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Current</span>
+                <span className="text-sm font-semibold">${selectedGoal?.current.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Target</span>
+                <span className="text-sm font-semibold">${selectedGoal?.target.toLocaleString()}</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={() => setIsContributeOpen(false)}>
+                Add Contribution
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setIsContributeOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
