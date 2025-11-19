@@ -1,86 +1,266 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Mountain, Menu, Bell, Settings, User, TrendingUp, TrendingDown, DollarSign, CreditCard, Wallet, Building2, ArrowUpRight, ArrowDownRight, Plus, Loader2 } from 'lucide-react'
+import { Mountain, Menu, Bell, Settings, User, TrendingUp, TrendingDown, DollarSign, CreditCard, Wallet, Building2, ArrowUpRight, ArrowDownRight, Plus, Loader2, AlertCircle, Edit, Trash2 } from 'lucide-react'
 import Link from "next/link"
 import { Line, LineChart, Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { DataService } from '@/lib/data-service'
-import { useAuth } from '@clerk/nextjs'
+import { useUser } from '@clerk/nextjs'
+import { toast } from 'sonner'
 
-const accounts = [
-  { id: 1, name: 'Checking Account', type: 'checking', balance: 5420.50, bank: 'Chase Bank', last4: '1234', icon: Wallet, color: '#3b82f6' },
-  { id: 2, name: 'Savings Account', type: 'savings', balance: 8240.00, bank: 'Chase Bank', last4: '5678', icon: Building2, color: '#10b981' },
-  { id: 3, name: 'Credit Card', type: 'credit', balance: -1210.50, bank: 'Visa', last4: '9012', icon: CreditCard, color: '#ef4444' },
-]
+interface Account {
+  id: string
+  name: string
+  type: 'checking' | 'savings' | 'credit' | 'investment'
+  balance: number
+  currency: string
+  institution?: string
+  account_number?: string
+  last_four?: string
+  is_active: boolean
+  created_at: string
+}
 
-const balanceHistory = [
-  { month: 'Jan', balance: 11200 },
-  { month: 'Feb', balance: 11800 },
-  { month: 'Mar', balance: 12100 },
-  { month: 'Apr', balance: 12450 },
-  { month: 'May', balance: 12150 },
-  { month: 'Jun', balance: 12450 },
-]
+interface BalanceHistory {
+  month: string
+  balance: number
+}
 
-const cashFlowData = [
-  { month: 'Jan', inflow: 4500, outflow: 2400 },
-  { month: 'Feb', inflow: 5200, outflow: 2800 },
-  { month: 'Mar', inflow: 4800, outflow: 3200 },
-  { month: 'Apr', inflow: 4500, outflow: 2600 },
-  { month: 'May', inflow: 5500, outflow: 2900 },
-  { month: 'Jun', inflow: 4500, outflow: 3100 },
-]
-
-const recentActivity = [
-  { id: 1, description: 'Monthly Salary', amount: 4500, date: '2024-01-13', type: 'income', account: 'Checking' },
-  { id: 2, name: 'Savings Transfer', amount: 500, date: '2024-01-12', type: 'transfer', account: 'Savings' },
-  { id: 3, name: 'Credit Card Payment', amount: -650, date: '2024-01-11', type: 'payment', account: 'Credit Card' },
-  { id: 4, name: 'Freelance Income', amount: 850, date: '2024-01-07', type: 'income', account: 'Checking' },
-]
+interface CashFlowData {
+  month: string
+  inflow: number
+  outflow: number
+}
 
 export default function BalancePage() {
-  const { userId } = useAuth()
-  const [accounts, setAccounts] = useState<any[]>([])
+  const { user } = useUser()
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [balanceHistory, setBalanceHistory] = useState<BalanceHistory[]>([])
+  const [cashFlowData, setCashFlowData] = useState<CashFlowData[]>([])
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Form data for new account
+  const [newAccount, setNewAccount] = useState({
+    name: '',
+    type: 'checking' as 'checking' | 'savings' | 'credit' | 'investment',
+    balance: '',
+    institution: '',
+    account_number: '',
+    last_four: '',
+  })
+
+  // Load data on mount
   useEffect(() => {
-    if (userId) {
-      loadAccounts()
+    if (user) {
+      loadData()
     }
-  }, [userId])
+  }, [user])
 
-  const loadAccounts = async () => {
+  const loadData = async () => {
+    if (!user?.id) return
+
     try {
-      const data = await DataService.getAccounts(userId!)
-      setAccounts(data)
-    } catch (error) {
-      console.error('Error loading accounts:', error)
+      setLoading(true)
+      setError(null)
+
+      // Load accounts and transactions
+      const [accountsData, transactionsData] = await Promise.all([
+        DataService.getAccounts(user.id),
+        DataService.getTransactions(user.id)
+      ])
+
+      setAccounts(accountsData as any[])
+
+      // Process balance history and cash flow data
+      const processedData = processAccountData(accountsData as any[], transactionsData as any[])
+      setBalanceHistory(processedData.balanceHistory)
+      setCashFlowData(processedData.cashFlowData)
+      setRecentTransactions(processedData.recentTransactions)
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load account data')
+      console.error('Error loading account data:', err)
     } finally {
       setLoading(false)
     }
   }
 
+  const processAccountData = (accounts: any[], transactions: any[]) => {
+    // Calculate balance history over time
+    const monthlyBalances: { [key: string]: number } = {}
+    const monthlyCashFlow: { [key: string]: { inflow: number; outflow: number } } = {}
+
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.date)
+      const monthKey = date.toLocaleString('default', { month: 'short' })
+
+      // Initialize if not exists
+      if (!monthlyBalances[monthKey]) monthlyBalances[monthKey] = 0
+      if (!monthlyCashFlow[monthKey]) monthlyCashFlow[monthKey] = { inflow: 0, outflow: 0 }
+
+      // Update balance (simplified - in reality would need to track running balance)
+      if (transaction.type === 'income') {
+        monthlyBalances[monthKey] += transaction.amount
+        monthlyCashFlow[monthKey].inflow += transaction.amount
+      } else if (transaction.type === 'expense') {
+        monthlyBalances[monthKey] -= transaction.amount
+        monthlyCashFlow[monthKey].outflow += transaction.amount
+      }
+    })
+
+    // Convert to arrays
+    const balanceHistory: BalanceHistory[] = Object.entries(monthlyBalances)
+      .map(([month, balance]) => ({ month, balance }))
+      .sort((a, b) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        return months.indexOf(a.month) - months.indexOf(b.month)
+      })
+
+    const cashFlowData: CashFlowData[] = Object.entries(monthlyCashFlow)
+      .map(([month, data]) => ({ month, ...data }))
+      .sort((a, b) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        return months.indexOf(a.month) - months.indexOf(b.month)
+      })
+
+    // Get recent transactions (last 5)
+    const recentTransactions = transactions
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5)
+
+    return { balanceHistory, cashFlowData, recentTransactions }
+  }
+
+  const handleCreateAccount = async () => {
+    if (!newAccount.name || !newAccount.type) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const accountData = {
+        ...newAccount,
+        balance: parseFloat(newAccount.balance) || 0,
+      }
+
+      const response = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(accountData),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create account')
+      }
+
+      toast.success('Account created successfully')
+      setIsAddDialogOpen(false)
+      setNewAccount({
+        name: '',
+        type: 'checking',
+        balance: '',
+        institution: '',
+        account_number: '',
+        last_four: '',
+      })
+
+      // Reload data
+      loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create account')
+      console.error('Error creating account:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteAccount = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this account?')) return
+
+    try {
+      const response = await fetch(`/api/accounts/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) throw new Error('Failed to delete account')
+
+      toast.success('Account deleted successfully')
+      loadData()
+    } catch (err) {
+      toast.error('Failed to delete account')
+      console.error('Error deleting account:', err)
+    }
+  }
+
+  // Calculate derived metrics
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0)
   const liquidBalance = accounts.filter(a => a.type !== 'credit').reduce((sum, acc) => sum + acc.balance, 0)
   const creditUtilization = Math.abs(accounts.filter(a => a.type === 'credit').reduce((sum, acc) => sum + acc.balance, 0))
-  
+
   const lastMonthBalance = balanceHistory[balanceHistory.length - 2]?.balance || 0
   const currentBalance = balanceHistory[balanceHistory.length - 1]?.balance || 0
-  const balanceChange = ((currentBalance - lastMonthBalance) / lastMonthBalance) * 100
+  const balanceChange = lastMonthBalance > 0 ? ((currentBalance - lastMonthBalance) / lastMonthBalance) * 100 : 0
+
+  const getAccountIcon = (type: string) => {
+    switch (type) {
+      case 'checking': return Wallet
+      case 'savings': return Building2
+      case 'credit': return CreditCard
+      case 'investment': return TrendingUp
+      default: return Wallet
+    }
+  }
+
+  const getAccountColor = (type: string) => {
+    switch (type) {
+      case 'checking': return '#3b82f6'
+      case 'savings': return '#10b981'
+      case 'credit': return '#ef4444'
+      case 'investment': return '#8b5cf6'
+      default: return '#6b7280'
+    }
+  }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-gray-500">Loading your account data...</p>
+          <p className="text-muted-foreground">Loading your account data...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Failed to load accounts</h3>
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button onClick={loadData}>Try Again</Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -160,10 +340,104 @@ export default function BalancePage() {
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Balance Overview</h1>
             <p className="text-sm text-muted-foreground mt-1">Monitor your accounts and net worth</p>
           </div>
-          <Button className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Account
-          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Account
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add New Account</DialogTitle>
+                <DialogDescription>Connect a new financial account to track your balance</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="account-name">Account Name *</Label>
+                  <Input
+                    id="account-name"
+                    placeholder="e.g., Main Checking"
+                    value={newAccount.name}
+                    onChange={(e) => setNewAccount(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-type">Account Type *</Label>
+                  <Select
+                    value={newAccount.type}
+                    onValueChange={(value: 'checking' | 'savings' | 'credit' | 'investment') =>
+                      setNewAccount(prev => ({ ...prev, type: value }))
+                    }
+                  >
+                    <SelectTrigger id="account-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="checking">Checking</SelectItem>
+                      <SelectItem value="savings">Savings</SelectItem>
+                      <SelectItem value="credit">Credit Card</SelectItem>
+                      <SelectItem value="investment">Investment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-balance">Current Balance</Label>
+                  <Input
+                    id="account-balance"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newAccount.balance}
+                    onChange={(e) => setNewAccount(prev => ({ ...prev, balance: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-institution">Institution (Optional)</Label>
+                  <Input
+                    id="account-institution"
+                    placeholder="e.g., Chase Bank"
+                    value={newAccount.institution}
+                    onChange={(e) => setNewAccount(prev => ({ ...prev, institution: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-last-four">Last 4 Digits (Optional)</Label>
+                  <Input
+                    id="account-last-four"
+                    placeholder="1234"
+                    maxLength={4}
+                    value={newAccount.last_four}
+                    onChange={(e) => setNewAccount(prev => ({ ...prev, last_four: e.target.value }))}
+                  />
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    className="flex-1"
+                    onClick={handleCreateAccount}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Add Account'
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsAddDialogOpen(false)}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Summary Cards */}
