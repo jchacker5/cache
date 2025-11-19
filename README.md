@@ -19,7 +19,7 @@ A modern SaaS application for personal finance management with subscription bill
 - **Authentication**: Clerk
 - **Payments**: Stripe
 - **Charts**: Recharts
-- **Database**: Supabase (planned for production)
+- **Backend & Database**: Convex
 - **Deployment**: Vercel
 
 ## Getting Started
@@ -30,7 +30,7 @@ A modern SaaS application for personal finance management with subscription bill
 - pnpm (recommended) or npm
 - Stripe account
 - Clerk account
-- Supabase account (for production database)
+- Convex account (for backend and database)
 
 ### Installation
 
@@ -78,22 +78,30 @@ STRIPE_PRO_PRICE_ID=price_...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
-### Supabase (for production database)
+### Convex Backend
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
 ```
 
 ## Database Setup
 
-For development, the app uses mock data via the DataService. For production:
+1. Install Convex CLI (if not already installed):
+```bash
+npm install -g convex
+```
 
-1. Create a Supabase project
-2. Run the migration files in `supabase/migrations/`:
-   - `20241120000000_initial_schema.sql` - Creates all tables and RLS policies
-   - `20241120000001_seed_data.sql` - Optional seed data
-3. Configure the Supabase environment variables
+2. Initialize Convex in your project:
+```bash
+npx convex dev
+```
+
+This will:
+- Prompt you to log in with GitHub
+- Create a Convex project
+- Generate the Convex URL and save it to your `.env.local` file
+- Start the Convex dev server to sync your functions
+
+3. The schema and functions are already defined in the `convex/` directory. The dev server will automatically sync them to your Convex deployment.
 
 ## Stripe Setup
 
@@ -132,7 +140,7 @@ For development, the app uses mock data via the DataService. For production:
 - [ ] Environment variables configured
 - [ ] Stripe webhooks set up
 - [ ] Clerk application configured
-- [ ] Supabase database created and migrated
+- [ ] Convex project created and deployed
 - [ ] Domain configured (if custom)
 - [ ] SSL certificate enabled
 - [ ] Monitoring and analytics set up

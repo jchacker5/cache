@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { grokClient } from '@/lib/grok/client'
-import { createClient } from '@/lib/supabase/server'
+import { client } from '@/lib/convex/server'
+import { api } from '@/convex/_generated/api'
 import { z } from 'zod'
 
 const querySchema = z.object({
@@ -21,68 +22,41 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { query } = querySchema.parse(body)
 
-    const supabase = createClient()
-
     // Gather relevant financial data for context
     const [transactionsResult, budgetsResult, accountsResult, savingsGoalsResult] = await Promise.all([
-      // Get recent transactions (last 30 days)
-      supabase
-        .from('transactions')
-        .select(`
-          amount,
-          type,
-          date,
-          description,
-          merchant,
-          categories(name)
-        `)
-        .eq('user_id', userId)
-        .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .order('date', { ascending: false })
-        .limit(50),
-
-      // Get current budgets
-      supabase
-        .from('budgets')
-        .select(`
-          name,
-          amount,
-          spent,
-          period,
-          categories(name)
-        `)
-        .eq('user_id', userId)
-        .eq('is_active', true),
-
-      // Get account balances
-      supabase
-        .from('accounts')
-        .select('name, type, balance, currency')
-        .eq('user_id', userId)
-        .eq('is_active', true),
-
-      // Get savings goals
-      supabase
-        .from('savings_goals')
-        .select('name, target_amount, current_amount, monthly_contribution')
-        .eq('user_id', userId)
-        .eq('is_completed', false)
+      client.query(api.transactions.list, {
+        userId,
+        startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        limit: 50,
+      }),
+      client.query(api.budgets.list, {
+        userId,
+        activeOnly: true,
+      }),
+      client.query(api.accounts.list, {
+        userId,
+        activeOnly: true,
+      }),
+      client.query(api.savingsGoals.list, {
+        userId,
+        completed: 'false',
+      }),
     ])
 
     // Extract data from results
-    const transactions = transactionsResult.data || []
-    const budgets = budgetsResult.data || []
-    const accounts = accountsResult.data || []
-    const savingsGoals = savingsGoalsResult.data || []
+    const transactions = transactionsResult.transactions || []
+    const budgets = budgetsResult || []
+    const accounts = accountsResult || []
+    const savingsGoals = savingsGoalsResult || []
 
     // Calculate key metrics
     const totalIncome = transactions
       .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + (t.amount > 0 ? t.amount : 0), 0)
 
     const totalExpenses = Math.abs(transactions
       .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0))
+      .reduce((sum, t) => sum + (t.amount < 0 ? Math.abs(t.amount) : 0), 0))
 
     const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0)
 
@@ -101,7 +75,7 @@ Recent Transactions (last 30 days): ${transactions.slice(0, 10).map(t =>
 ).join(', ')}
 
 Budgets: ${budgets.map(b =>
-  `${b.categories?.name || b.name}: $${b.spent}/${b.amount} (${b.period})`
+  `${b.categories?.name || b.name}: $${b.current_spending}/${b.amount} (${b.period})`
 ).join(', ')}
 
 Accounts: ${accounts.map(a =>
@@ -133,10 +107,10 @@ Respond naturally as a financial assistant would.
 
     const response = await grokClient.query(prompt, context)
 
-    // Store the query for analytics (optional)
+    // Store the query for analytics
     try {
-      await supabase.from('ai_queries').insert({
-        user_id: userId,
+      await client.mutation(api.aiQueries.create, {
+        userId,
         query,
         response,
         context: {
@@ -145,7 +119,7 @@ Respond naturally as a financial assistant would.
           monthly_expenses: totalExpenses,
           budgets_count: budgets.length,
           goals_count: savingsGoals.length,
-        }
+        },
       })
     } catch (error) {
       // Don't fail the response if analytics storage fails

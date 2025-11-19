@@ -6,7 +6,7 @@ Before deploying, ensure you have:
 
 1. **Clerk Account** - For authentication
 2. **Stripe Account** - For subscription billing
-3. **Supabase Account** - For database (production)
+3. **Convex Account** - For backend and database
 4. **Vercel Account** - For deployment
 
 ## Environment Variables Setup
@@ -53,21 +53,31 @@ STRIPE_PRO_PRICE_ID=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-### 3. Supabase Configuration (Production Database)
+### 3. Convex Configuration
 
-1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
-2. Create a new project
-3. Go to SQL Editor and run the migrations in order:
-   - `supabase/migrations/20241120000000_initial_schema.sql`
-   - `supabase/migrations/20241120000001_seed_data.sql` (optional)
+1. Install Convex CLI (if not already installed):
+```bash
+npm install -g convex
+```
 
-4. Copy the connection details:
+2. Initialize Convex in your project:
+```bash
+npx convex dev
+```
+
+This will:
+- Prompt you to log in with GitHub
+- Create a Convex project
+- Generate the Convex URL and save it to your `.env.local` file
+- Start the Convex dev server to sync your functions
+
+3. Copy the Convex URL to your environment variables:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
 ```
+
+4. The schema and functions are already defined in the `convex/` directory. The dev server will automatically sync them to your Convex deployment.
 
 ## Vercel Deployment
 
@@ -93,9 +103,7 @@ Add all environment variables from the setup above in Vercel's Environment Varia
 - `STRIPE_BASIC_PRICE_ID`
 - `STRIPE_PRO_PRICE_ID`
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-- `NEXT_PUBLIC_SUPABASE_URL` (optional for MVP)
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (optional for MVP)
-- `SUPABASE_SERVICE_ROLE_KEY` (optional for MVP)
+- `NEXT_PUBLIC_CONVEX_URL`
 
 ### 3. Domain Configuration
 
@@ -169,9 +177,10 @@ Add all environment variables from the setup above in Vercel's Environment Varia
    - Test webhook delivery in Stripe dashboard
 
 4. **Database Issues**
-   - Ensure Supabase project is active
-   - Check RLS policies are enabled
-   - Verify connection strings
+   - Ensure Convex project is active
+   - Check Convex dashboard for function errors
+   - Verify NEXT_PUBLIC_CONVEX_URL is set correctly
+   - Run `npx convex dev` to sync functions
 
 ## Support
 
